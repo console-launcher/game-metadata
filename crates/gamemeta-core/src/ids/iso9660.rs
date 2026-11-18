@@ -112,14 +112,16 @@ fn find_entry<S: ByteSource + ?Sized>(
     None
 }
 
-/// The first `limit` bytes of the file at `path` (`SYSTEM.CNF`, `PSP_GAME/PARAM.SFO`: any depth) in the ISO 9660 image
-/// `source` holds in `layout`. `None` for a missing file, a folder, an empty file or anything damaged.
-pub(crate) fn read_file<S: ByteSource + ?Sized>(
-    source: &mut S,
-    layout: Layout,
-    path: &str,
-    limit: u64,
-) -> Option<Vec<u8>> {
+/// A file found by [`locate`]: where it starts and how big it is.
+pub(crate) struct Found {
+    extent: u32,
+    pub size: u64,
+    block: u64,
+}
+
+/// The file at `path` (`SYSTEM.CNF`, `PSP_GAME/PARAM.SFO`: any depth) in the ISO 9660 image `source` holds in `layout`, without
+/// reading it. `None` for a missing file, a folder, an empty file or anything damaged.
+pub(crate) fn locate<S: ByteSource + ?Sized>(source: &mut S, layout: Layout, path: &str) -> Option<Found> {
     let pvd = read_blocks(source, layout, 16, SECTOR, SECTOR)?;
     if pvd.len() < 190 || pvd[0] != 1 || &pvd[1..6] != b"CD001" {
         return None;
@@ -133,8 +135,19 @@ pub(crate) fn read_file<S: ByteSource + ?Sized>(
     if entry.directory || entry.size as i32 <= 0 || entry.extent as i32 <= -1 {
         return None;
     }
-    let size = u64::from(entry.size).min(limit);
-    let mut data = read_blocks(source, layout, u64::from(entry.extent), size, block)?;
+    Some(Found { extent: entry.extent, size: u64::from(entry.size), block })
+}
+
+/// The first `limit` bytes of the file at `path` (see [`locate`]).
+pub(crate) fn read_file<S: ByteSource + ?Sized>(
+    source: &mut S,
+    layout: Layout,
+    path: &str,
+    limit: u64,
+) -> Option<Vec<u8>> {
+    let found = locate(source, layout, path)?;
+    let size = found.size.min(limit);
+    let mut data = read_blocks(source, layout, u64::from(found.extent), size, found.block)?;
     data.truncate(size as usize);
     Some(data)
 }

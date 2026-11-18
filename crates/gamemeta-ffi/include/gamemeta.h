@@ -106,6 +106,12 @@ typedef enum {
   GM_PLATFORM_MASTER_SYSTEM = 15,
   // Sega Game Gear.
   GM_PLATFORM_GAME_GEAR = 16,
+  // Sony PSP.
+  GM_PLATFORM_PSP = 17,
+  // Sony PlayStation 3.
+  GM_PLATFORM_PS3 = 18,
+  // Sony PlayStation Vita.
+  GM_PLATFORM_VITA = 19,
 } GmPlatform;
 
 // Which string of a title ([`gm_info_title`]).

@@ -189,7 +189,8 @@ function drawIcon(bytes, { width, height }) {
 
 const PLATFORMS = { Ds: 'Nintendo DS', Dsi: 'Nintendo DSi', ThreeDs: 'Nintendo 3DS', GameCube: 'Nintendo GameCube', Wii: 'Nintendo Wii', WiiU: 'Nintendo Wii U',
   GameBoy: 'Game Boy', GameBoyColor: 'Game Boy Color', GameBoyAdvance: 'Game Boy Advance', Nintendo64: 'Nintendo 64', Snes: 'Super Nintendo', Nes: 'NES',
-  MegaDrive: 'Sega Genesis / Mega Drive', Sega32x: 'Sega 32X', MasterSystem: 'Sega Master System', GameGear: 'Sega Game Gear' };
+  MegaDrive: 'Sega Genesis / Mega Drive', Sega32x: 'Sega 32X', MasterSystem: 'Sega Master System', GameGear: 'Sega Game Gear',
+  Psp: 'Sony PSP', Ps3: 'Sony PlayStation 3', Vita: 'Sony PlayStation Vita' };
 
 const row = (term, value, extra = {}) => value == null || value === '' ? null : [h('dt', {}, term), h('dd', extra, value)];
 

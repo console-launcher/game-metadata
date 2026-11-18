@@ -1,3 +1,4 @@
 file: tux.pbp
-info: null
+info: {"platform":"Psp","title":"SuperTuxKart","titles":{"English":{"name":"SuperTuxKart","shortName":"SuperTuxKart","publisher":null}},"titleId":null,"productCode":"ULUS99901","gameId":null,"makerCode":null,"headerTitle":null,"icon":{"width":144,"height":80},"smallIcon":null,"animation":[],"images":["Icon","Background"],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica"],"regionFree":false,"ratings":{},"banner":null,"version":null,"cart":null}
 ids: {"serial":"ULUS99901","gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":"SuperTuxKart","pspDiscId":"ULUS99901","xboxId":null,"raMd5":null,"primaryId":"ULUS99901"}
+icon: 144x80 sha256=59414443cf4acbc56c1f5a097b37236e15c34350d82a4f38b73769d14e8cc51e

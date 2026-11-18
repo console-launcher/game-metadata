@@ -8,6 +8,10 @@ Notable changes per release. Format: [Keep a Changelog](https://keepachangelog.c
 - WIA images read like RVZ: bzip2, LZMA and LZMA2 groups decode (own bzip2 decoder, `lzma-rust2`), so a WIA gives its `opening.bnr`
   titles and logo, and an LZMA or bzip2 RVZ decodes too.
 - A WAD in the backup (`Bk`) layout, or any header the sizes do not place, gives its title id from the TMD found by its shape.
+- PSP games (`EBOOT.PBP`, PSP ISO): title, disc id, region, `ICON0.PNG` as the icon (the PNG reader now takes indexed colour),
+  `PIC1.PNG` on demand (`ImageKind::Background`), `ICON1.PMF` as bytes.
+- PS3 and Vita titles (`sony::read_ps3_title`, `read_vita_title` through a file callback) and Vita `.vpk` files: title, title id,
+  region, icon.
 
 ## [0.7.1]
 

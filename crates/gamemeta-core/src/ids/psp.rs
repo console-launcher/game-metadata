@@ -94,6 +94,37 @@ pub fn parse(bytes: &[u8]) -> Option<PspSfo> {
     (title.is_some() || disc_id.is_some()).then_some(PspSfo { title, disc_id })
 }
 
+/// Every string entry of a `PARAM.SFO` as (key, value): the values cleaned as [`parse`] cleans them, entries with no printable
+/// value left dropped. `None` when the bytes are not an SFO. PS3 and Vita SFOs carry many more keys than a PSP's.
+pub(crate) fn strings(bytes: &[u8]) -> Option<Vec<(String, String)>> {
+    if bytes.len() < 20 || bytes[..4] != [0, b'P', b'S', b'F'] {
+        return None;
+    }
+    let key_start = u64::from(u32_at(bytes, 8)?);
+    let data_start = u64::from(u32_at(bytes, 12)?);
+    let count = u32_at(bytes, 16)?.min(MAX_ENTRIES * 2) as usize;
+    let mut out = Vec::new();
+    for i in 0..count {
+        let entry = 20 + i * 16;
+        if entry + 16 > bytes.len() {
+            break;
+        }
+        // Format 0x0204 is a NUL-padded UTF-8 string, 0x0004 one without the padding; numbers (0x0404) are skipped.
+        if !matches!(u16_at(bytes, entry + 2), Some(0x0204 | 0x0004)) {
+            continue;
+        }
+        let Some(key) = c_string(bytes, key_start + u64::from(u16_at(bytes, entry)?), u64::MAX) else { continue };
+        let length = u64::from(u32_at(bytes, entry + 4)?);
+        let Some(value) = c_string(bytes, data_start + u64::from(u32_at(bytes, entry + 12)?), length) else {
+            continue;
+        };
+        if let Some(value) = printable(&value) {
+            out.push((key, value));
+        }
+    }
+    Some(out)
+}
+
 /// The NUL-terminated string at `offset`, at most `limit` bytes, or `None` when it lies outside `bytes`.
 fn c_string(bytes: &[u8], offset: u64, limit: u64) -> Option<String> {
     let len = bytes.len() as u64;

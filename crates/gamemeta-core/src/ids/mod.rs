@@ -18,7 +18,7 @@
 
 mod disc_id;
 mod gamecube;
-mod iso9660;
+pub(crate) mod iso9660;
 mod playstation;
 pub mod psp;
 mod ra;

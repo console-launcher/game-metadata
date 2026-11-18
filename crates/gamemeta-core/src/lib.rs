@@ -23,6 +23,7 @@
 
 extern crate alloc;
 
+mod bzip2;
 pub mod carts;
 mod deflate;
 mod formats;
@@ -31,9 +32,11 @@ pub mod ids;
 mod image;
 mod info;
 mod le;
+mod lzma;
 pub mod nds;
 pub mod png;
 mod sha256;
+pub mod sony;
 mod source;
 pub(crate) mod text;
 pub mod threeds;
@@ -41,8 +44,6 @@ pub mod wii;
 pub mod wiiu;
 mod zip;
 mod zstd;
-mod bzip2;
-mod lzma;
 
 pub use formats::{Support, supported_formats};
 pub use image::RgbaImage;
@@ -59,6 +60,10 @@ pub fn format_for(file_name: &str) -> Option<Format> {
         Some(Format::Ds)
     } else if nds::is_zip(file_name) {
         Some(Format::DsZip)
+    } else if sony::is_pbp(file_name) {
+        Some(Format::Pbp)
+    } else if sony::is_vpk(file_name) {
+        Some(Format::Vpk)
     } else if wii::is_wad(file_name) {
         Some(Format::Wad)
     } else if wiiu::is_wua(file_name) {
@@ -87,6 +92,10 @@ pub enum Format {
     Disc,
     /// A Wii WAD (an installable channel, WiiWare or Virtual Console title): `.wad`.
     Wad,
+    /// A PSP `EBOOT.PBP`: title, disc id, `ICON0.PNG` as the icon, `PIC1.PNG` on demand; see [`sony`].
+    Pbp,
+    /// A PlayStation Vita `.vpk` (a zip): `sce_sys/param.sfo` and `sce_sys/icon0.png`; see [`sony`].
+    Vpk,
     /// A Wii U `.wua` (a ZArchive of titles); the base title is read.
     WiiUArchive,
     /// A Wii U `.rpx`: the title is the folder around it, which only the caller can open, so [`read`] gives nothing;
@@ -106,7 +115,11 @@ pub fn read<S: ByteSource + ?Sized>(source: &mut S, file_name: &str) -> Option<G
         Format::ThreeDs => threeds::read_info(source),
         Format::Ds => nds::read_info(source),
         Format::DsZip => nds::read_zip_info(source).or_else(|| carts::read_zip_info(source)),
-        Format::Disc => gc::read_info(source).or_else(|| wii::read_info(source)),
+        Format::Disc => {
+            gc::read_info(source).or_else(|| wii::read_info(source)).or_else(|| sony::read_psp_info(source, file_name))
+        }
+        Format::Pbp => sony::read_psp_info(source, file_name),
+        Format::Vpk => sony::read_vpk_info(source),
         Format::Wad => wii::read_wad_info(source),
         Format::WiiUArchive => wiiu::read_wua_info(source),
         Format::WiiUTitle => None,

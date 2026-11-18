@@ -386,6 +386,53 @@ pub fn sample_xbe() -> Vec<u8> {
     xbe(0x4D53_0004, 1, 0x10000, 0x178)
 }
 
+/// An `EBOOT.PBP` with the five art files after the SFO, in header order: ICON0.PNG, ICON1.PMF, PIC0.PNG, PIC1.PNG, SND0.AT3
+/// (an empty slice is an absent file, as a real PBP stores it).
+pub fn pbp_with(sfo: &[u8], parts: [&[u8]; 5]) -> Vec<u8> {
+    let mut h = Le::new(40);
+    h.bytes(0, &[0, b'P', b'B', b'P']).u32(4, 0x10000).u32(8, 40);
+    let mut at = 40 + sfo.len() as u32;
+    for (i, part) in parts.iter().enumerate() {
+        h.u32(12 + 4 * i, at);
+        at += part.len() as u32;
+    }
+    // DATA.PSP and DATA.PSAR start where the art ends.
+    h.u32(32, at).u32(36, at);
+    let mut out = h.0;
+    out.extend(sfo);
+    for part in parts {
+        out.extend(part);
+    }
+    out
+}
+
+/// A PNG of 8-bit indexed colour (colour type 3): `palette` entries and one palette index per pixel.
+pub fn png_indexed(width: u32, height: u32, palette: &[[u8; 3]], indices: &[u8]) -> Vec<u8> {
+    assert_eq!(indices.len(), (width * height) as usize);
+    let mut raw = Vec::new();
+    for row in indices.chunks(width as usize) {
+        raw.push(0);
+        raw.extend(row);
+    }
+    let chunk = |kind: &[u8; 4], data: &[u8]| {
+        let mut c = (data.len() as u32).to_be_bytes().to_vec();
+        let mut body = kind.to_vec();
+        body.extend(data);
+        c.extend(&body);
+        c.extend(crc32(&body).to_be_bytes());
+        c
+    };
+    let mut ihdr = width.to_be_bytes().to_vec();
+    ihdr.extend(height.to_be_bytes());
+    ihdr.extend([8, 3, 0, 0, 0]);
+    let mut out = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    out.extend(chunk(b"IHDR", &ihdr));
+    out.extend(chunk(b"PLTE", &palette.concat()));
+    out.extend(chunk(b"IDAT", &miniz_oxide::deflate::compress_to_vec_zlib(&raw, 6)));
+    out.extend(chunk(b"IEND", &[]));
+    out
+}
+
 /// A WAD in the backup layout: a 0x70 byte `Bk` header (the field layout is not read), then the TMD at the next 64 byte
 /// boundary, signed RSA-2048, issued by a CP certificate, holding `title_id` at 0x18C.
 pub fn wad_backup(title_id: u64) -> Vec<u8> {

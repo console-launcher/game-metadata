@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 //! Plain PNG for RGBA8 pictures: [`encode`] writes 8-bit RGBA, no interlace (what a rendered banner is saved as), and
-//! [`decode`] reads 8-bit RGBA or RGB, non-interlaced, any filter (enough for the pictures this project writes and its goldens).
+//! [`decode`] reads 8-bit RGBA or RGB and indexed colour (1 to 8 bits, with `tRNS`), non-interlaced, any filter (enough for the
+//! pictures this project writes and its goldens, and game icons such as a PSP's `ICON0.PNG`).
 
 use alloc::vec::Vec;
 
@@ -56,13 +57,15 @@ fn crc32(data: &[u8]) -> u32 {
 /// Most pixels [`decode`] accepts (64 Mpx).
 const MAX_PIXELS: usize = 1 << 26;
 
-/// A PNG's pixels as RGBA8; `None` for anything but 8-bit RGBA or RGB without interlace, or damaged data. CRCs are not checked.
+/// A PNG's pixels as RGBA8; `None` for anything but 8-bit RGBA or RGB or indexed colour without interlace, or damaged data. CRCs
+/// are not checked.
 pub fn decode(bytes: &[u8]) -> Option<RgbaImage> {
     if bytes.get(..8)? != SIGNATURE {
         return None;
     }
     let mut at = 8;
-    let (mut width, mut height, mut channels) = (0usize, 0usize, 0usize);
+    let (mut width, mut height, mut channels, mut depth) = (0usize, 0usize, 0usize, 8usize);
+    let (mut palette, mut alpha, mut indexed) = (Vec::new(), Vec::new(), false);
     let mut idat = Vec::new();
     while at + 8 <= bytes.len() {
         let len = u32::from_be_bytes(bytes[at..at + 4].try_into().ok()?) as usize;
@@ -73,12 +76,17 @@ pub fn decode(bytes: &[u8]) -> Option<RgbaImage> {
                 let d = data.get(..13)?;
                 width = u32::from_be_bytes(d[0..4].try_into().ok()?) as usize;
                 height = u32::from_be_bytes(d[4..8].try_into().ok()?) as usize;
+                depth = usize::from(d[8]);
+                indexed = d[9] == 3;
                 channels = match (d[8], d[9], d[12]) {
                     (8, 6, 0) => 4,
                     (8, 2, 0) => 3,
+                    (1 | 2 | 4 | 8, 3, 0) => 1,
                     _ => return None,
                 };
             }
+            b"PLTE" => palette = data.to_vec(),
+            b"tRNS" => alpha = data.to_vec(),
             b"IDAT" => idat.extend_from_slice(data),
             b"IEND" => break,
             _ => {}
@@ -88,7 +96,10 @@ pub fn decode(bytes: &[u8]) -> Option<RgbaImage> {
     if channels == 0 || width == 0 || height == 0 || width.checked_mul(height)? > MAX_PIXELS {
         return None;
     }
-    let stride = width * channels;
+    if indexed && palette.len() < 3 {
+        return None;
+    }
+    let stride = if indexed { (width * depth).div_ceil(8) } else { width * channels };
     let raw = miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(&idat, (stride + 1) * height).ok()?;
     if raw.len() != (stride + 1) * height {
         return None;
@@ -112,10 +123,20 @@ pub fn decode(bytes: &[u8]) -> Option<RgbaImage> {
                 _ => return None,
             };
         }
-        for px in cur.chunks(channels) {
-            pixels.extend_from_slice(px);
-            if channels == 3 {
-                pixels.push(255);
+        if indexed {
+            for x in 0..width {
+                let bit = x * depth;
+                let index = usize::from(cur[bit / 8] >> (8 - depth - bit % 8)) & ((1 << depth) - 1);
+                let color = palette.get(index * 3..index * 3 + 3)?;
+                pixels.extend_from_slice(color);
+                pixels.push(alpha.get(index).copied().unwrap_or(255));
+            }
+        } else {
+            for px in cur.chunks(channels) {
+                pixels.extend_from_slice(px);
+                if channels == 3 {
+                    pixels.push(255);
+                }
             }
         }
         core::mem::swap(&mut cur, &mut prev);

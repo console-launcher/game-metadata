@@ -36,6 +36,7 @@ pub fn supported_formats() -> Vec<Support> {
         rows.push(row(family.name(), family.extensions()));
     }
     rows.push(row("PlayStation, PSP", &["iso", "bin", "img", "cue", "pbp"]));
+    rows.push(row("PlayStation Vita", &["vpk"]));
     rows.push(row("Nintendo Switch", &["nsp"]));
     rows.push(row("Xbox", &["xbe"]));
     rows.push(row("CHD disc images", &["chd"]));

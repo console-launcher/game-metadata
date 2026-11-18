@@ -113,6 +113,12 @@ pub enum GmPlatform {
     MasterSystem = 15,
     /// Sega Game Gear.
     GameGear = 16,
+    /// Sony PSP.
+    Psp = 17,
+    /// Sony PlayStation 3.
+    Ps3 = 18,
+    /// Sony PlayStation Vita.
+    Vita = 19,
 }
 
 /// Which string of a title ([`gm_info_title`]).
@@ -167,6 +173,8 @@ pub enum GmImage {
     GamePadSplash = 4,
     /// Wii U boot logo.
     BootLogo = 5,
+    /// PSP `PIC1.PNG` background.
+    Background = 6,
 }
 
 /// Which icon ([`gm_info_icon`]).

@@ -8,7 +8,7 @@ package gamemeta
 enum class Platform(val code: Int) {
     DS(1), DSi(2), ThreeDS(3), GameCube(4), Wii(5), WiiU(6),
     GameBoy(7), GameBoyColor(8), GameBoyAdvance(9), Nintendo64(10), Snes(11), Nes(12), MegaDrive(13), Sega32x(14),
-    MasterSystem(15), GameGear(16),
+    MasterSystem(15), GameGear(16), Psp(17), Ps3(18), Vita(19),
 }
 
 /** Title languages, in 3DS SMDH slot order. */
@@ -28,6 +28,7 @@ enum class ImageKind(val bit: Int) {
     /** The Wii U TV boot splash (1280x720). */ TvSplash(3),
     /** The Wii U GamePad boot splash (854x480). */ GamePadSplash(4),
     /** The Wii U `bootLogoTex.tga`. */ BootLogo(5),
+    /** A PSP game's `PIC1.PNG` background (480x272). */ Background(6),
 }
 
 /** One step of a DSi animated icon: show [frame] for [durationFrames] sixtieths of a second. */

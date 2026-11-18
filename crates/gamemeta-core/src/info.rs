@@ -44,6 +44,12 @@ pub enum Platform {
     MasterSystem = 15,
     /// Sega Game Gear.
     GameGear = 16,
+    /// Sony PSP.
+    Psp = 17,
+    /// Sony PlayStation 3.
+    Ps3 = 18,
+    /// Sony PlayStation Vita.
+    Vita = 19,
 }
 
 /// Title languages, numbered as 3DS SMDH files store them (slots 12-15 are unused there and dropped).
@@ -197,6 +203,8 @@ pub enum ImageKind {
     GamePadSplash = 4,
     /// The Wii U `bootLogoTex.tga`.
     BootLogo = 5,
+    /// A PSP game's `PIC1.PNG` background (480x272), decoded on demand.
+    Background = 6,
 }
 
 /// A byte range of the file.
