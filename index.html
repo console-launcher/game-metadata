@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Titles, icons, IDs and 3DS banners from your game files. Your files stay on your device.">
+<title>game-metadata</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<main>
+<header>
+  <div class="title">
+    <h1>game-metadata</h1>
+    <p class="lead">Titles, icons, IDs and 3DS banners from your game files.</p>
+  </div>
+  <a class="repo" href="https://github.com/console-launcher/game-metadata" aria-label="Source on GitHub" title="Source on GitHub"><svg viewBox="0 0 16 16" width="28" height="28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+</header>
+
+<section class="viewer" aria-labelledby="viewer-h">
+  <h2 id="viewer-h" class="sr-only">Your files</h2>
+  <div id="drop" class="drop" role="group" aria-labelledby="drop-h">
+    <p id="drop-h" class="prompt">Drop game files or a folder here, or choose them.</p>
+    <div class="controls">
+      <label class="button">Choose files <input id="pick-files" type="file" multiple></label>
+      <label class="button quiet">Choose a folder <input id="pick-folder" type="file" webkitdirectory></label>
+      <button id="demo" type="button" class="quiet" disabled>Try a demo</button>
+      <button id="clear" type="button" class="quiet">Clear</button>
+    </div>
+    <p class="privacy">Your files stay on your device.</p>
+  </div>
+  <p id="status" role="status" aria-live="polite" class="muted">Getting ready…</p>
+  <p id="progress" role="status" aria-live="polite" aria-atomic="true" class="muted"></p>
+  <details id="skipped" hidden></details>
+  <div id="results"></div>
+</section>
+
+<section class="formats" aria-labelledby="formats-h">
+  <h2 id="formats-h">Supported files</h2>
+  <table aria-labelledby="formats-h">
+    <thead><tr><th scope="col">System</th><th scope="col">File types</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">Nintendo 3DS</th><td><code>.3ds</code> <code>.cci</code> <code>.cxi</code> <code>.cia</code> <code>.app</code></td></tr>
+      <tr><th scope="row">Nintendo DS, DSi</th><td><code>.nds</code> <code>.dsi</code> <code>.srl</code> <code>.ids</code> <code>.zip</code></td></tr>
+      <tr><th scope="row">Nintendo GameCube, Wii</th><td><code>.iso</code> <code>.gcm</code> <code>.ciso</code> <code>.gcz</code> <code>.rvz</code> <code>.wia</code> <code>.tgc</code> <code>.wbfs</code> <code>.wad</code></td></tr>
+      <tr><th scope="row">Nintendo Wii U (also a game folder)</th><td><code>.rpx</code> <code>.wua</code></td></tr>
+      <tr><th scope="row">Game Boy, Game Boy Color</th><td><code>.gb</code> <code>.gbc</code> <code>.sgb</code></td></tr>
+      <tr><th scope="row">Game Boy Advance</th><td><code>.gba</code> <code>.agb</code></td></tr>
+      <tr><th scope="row">Nintendo 64</th><td><code>.z64</code> <code>.v64</code> <code>.n64</code></td></tr>
+      <tr><th scope="row">Super Nintendo</th><td><code>.sfc</code> <code>.smc</code> <code>.swc</code> <code>.fig</code></td></tr>
+      <tr><th scope="row">NES</th><td><code>.nes</code></td></tr>
+      <tr><th scope="row">Sega Genesis, 32X</th><td><code>.md</code> <code>.gen</code> <code>.bin</code> <code>.smd</code> <code>.32x</code></td></tr>
+      <tr><th scope="row">Master System, Game Gear</th><td><code>.sms</code> <code>.gg</code></td></tr>
+      <tr><th scope="row">PlayStation, PSP</th><td><code>.iso</code> <code>.bin</code> <code>.img</code> <code>.cue</code> <code>.pbp</code></td></tr>
+      <tr><th scope="row">PlayStation Vita</th><td><code>.vpk</code></td></tr>
+      <tr><th scope="row">Nintendo Switch</th><td><code>.nsp</code></td></tr>
+      <tr><th scope="row">Xbox</th><td><code>.xbe</code></td></tr>
+      <tr><th scope="row">CHD disc images</th><td><code>.chd</code></td></tr>
+      <tr><th scope="row">Other systems (checksum only)</th><td><code>.vb</code> <code>.ws</code> <code>.wsc</code> <code>.ngp</code> <code>.ngc</code> <code>.a26</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <p>MPL-2.0 · <a href="NOTICE.md">Notices and third-party licenses</a></p>
+  <p id="credits">Tux files: art from SuperTuxKart (https://supertuxkart.net) by Julian &quot;XGhost&quot; Schönbächler and others (the 3DS banner: MiniBjorn, Thomas Oppl, Moser Juan José, Semphris, rastapax), CC-BY-SA 3.0; the demo files are CC-BY-SA 3.0 too. <a href="CREDITS.md">Credits and license</a></p>
+  <p id="trademarks">game-metadata is an independent project. It is not affiliated with, authorized, sponsored or endorsed by Nintendo, Sony, Microsoft, Sega or any other game or console company. Nintendo 3DS, Nintendo 3DS HOME Menu, Wii, Wii U, Game Boy, Nintendo DS, GameCube, PlayStation, Xbox, Sega Genesis, Mega Drive, Master System and Game Gear, and the other console, format and game names used here, are trademarks of their respective owners and are used only to say which file formats the library reads. The project contains no game data, keys or console firmware and never unlocks protected files.</p>
+</footer>
+</main>
+</body>
+</html>
