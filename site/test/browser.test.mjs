@@ -265,6 +265,7 @@ test('a file nothing reads gets a clear error, and Clear removes the cards', asy
   assert.match((await cardTexts(page))[0], /notes\.txt[\s\S]*isn’t supported/);
   await page.click('#clear');
   assert.equal((await cardTexts(page)).length, 0);
+  assert.equal(await page.locator('#clear').isVisible(), false, 'Clear hides again once nothing is left');
 });
 
 test('the page loads only its own files and names no outside host', async () => {
@@ -274,9 +275,10 @@ test('the page loads only its own files and names no outside host', async () => 
   for (const p of ['/', '/app.js', '/worker.js', '/pkg/gamemeta_wasm_bg.wasm']) assert.ok(paths.has(p), `${p} was loaded`);
 });
 
-// The viewer is the page: at any width the title, GitHub link, drop zone, pickers and the privacy line are on the first screen, and
-// the drop zone fills most of it; the Supported files list sits below. No README one-liners.
-test('the viewer fills the first screen at phone and desktop widths, in both colour schemes', async () => {
+// At any width the title, GitHub link, drop zone, pickers and the privacy line are on the first screen. The empty drop zone is a
+// compact box, centred and as wide as the header, with its prompt centred; Clear is hidden until there is something to clear.
+// No README one-liners.
+test('the drop zone is compact and centred at phone and desktop widths, in both colour schemes', async () => {
   for (const [width, height] of [[375, 667], [1280, 800]]) {
     for (const colorScheme of ['light', 'dark']) {
       const context = await browser.newContext({ viewport: { width, height }, colorScheme, isMobile: width < 500 });
@@ -291,7 +293,13 @@ test('the viewer fills the first screen at phone and desktop widths, in both col
         assert.ok(box && box.y + box.height <= height + 1, `${where}: ${sel} is on the first screen (${JSON.stringify(box)})`);
       }
       const drop = await page.locator('#drop').boundingBox();
-      assert.ok(drop.height > height * 0.4, `${where}: the viewer fills the first screen (${drop.height}px of ${height})`);
+      assert.ok(drop.height < 360, `${where}: the empty drop zone is compact (${drop.height}px)`);
+      const header = await page.locator('header').boundingBox();
+      assert.ok(Math.abs(drop.x - header.x) <= 1 && Math.abs(drop.width - header.width) <= 1, `${where}: the drop zone is as wide as the header`);
+      const prompt = await page.locator('#drop-h').evaluate((e) => getComputedStyle(e).textAlign);
+      assert.equal(prompt, 'center', `${where}: the prompt is centred`);
+      assert.equal(await page.locator('#clear').isVisible(), false, `${where}: Clear is hidden with nothing loaded`);
+      assert.equal(await page.locator('.privacy strong').count(), 0, `${where}: the privacy line is quiet text`);
       assert.equal(await page.locator('table, [data-readme]').count(), 0, 'nothing of the README is repeated');
       const link = page.locator('a[aria-label="Source on GitHub"]');
       assert.ok((await link.getAttribute('href')).startsWith('http'), 'the repo link has an address');
