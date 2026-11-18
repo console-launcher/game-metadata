@@ -41,6 +41,8 @@ pub mod wii;
 pub mod wiiu;
 mod zip;
 mod zstd;
+mod bzip2;
+mod lzma;
 
 pub use formats::{Support, supported_formats};
 pub use image::RgbaImage;

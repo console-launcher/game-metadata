@@ -208,10 +208,77 @@ pub fn zstd(bytes: &[u8]) -> Vec<u8> {
     ruzstd::encoding::compress_to_vec(bytes, ruzstd::encoding::CompressionLevel::Fastest)
 }
 
+/// `bytes` compressed the way a WIA or RVZ names it: 0 stored, 2 bzip2, 3 LZMA (raw, no end marker), 4 LZMA2, 5 zstd.
+pub fn compress(method: u32, bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    match method {
+        0 => bytes.to_vec(),
+        2 => {
+            let mut w = bzip2::write::BzEncoder::new(Vec::new(), bzip2::Compression::fast());
+            w.write_all(bytes).expect("bzip2 into memory");
+            w.finish().expect("bzip2 into memory")
+        }
+        3 => {
+            let mut w =
+                lzma_rust2::LzmaWriter::new_no_header(Vec::new(), &lzma_rust2::LzmaOptions::with_preset(1), false)
+                    .expect("lzma options");
+            w.write_all(bytes).expect("lzma into memory");
+            w.finish().expect("lzma into memory")
+        }
+        4 => {
+            let mut w = lzma_rust2::Lzma2Writer::new(Vec::new(), lzma_rust2::Lzma2Options::with_preset(1));
+            w.write_all(bytes).expect("lzma2 into memory");
+            w.finish().expect("lzma2 into memory")
+        }
+        5 => zstd(bytes),
+        _ => panic!("no such WIA compression {method}"),
+    }
+}
+
+/// The `compr_data` bytes header 2 keeps for `method`: LZMA's properties byte and dictionary size, LZMA2's dictionary byte.
+pub fn compr_data(method: u32) -> Vec<u8> {
+    let preset = lzma_rust2::LzmaOptions::with_preset(1);
+    match method {
+        3 => {
+            let props = (preset.pb * 5 + preset.lp) * 9 + preset.lc;
+            let mut v = vec![props as u8];
+            v.extend(preset.dict_size.to_le_bytes());
+            v
+        }
+        4 => {
+            // The smallest dictionary byte whose size covers the preset's.
+            let size = |b: u32| (2u64 | u64::from(b & 1)) << (b / 2 + 11);
+            vec![(0..40).find(|&b| size(b) >= u64::from(preset.dict_size)).unwrap_or(40) as u8]
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Group table entries are 12 bytes in an RVZ (offset, size with the compressed flag, packed size) and 8 in a WIA (offset,
+/// size).
+pub fn group_entry(magic: &[u8; 4], offset: u32, size: u32, flag: u32, packed: u32) -> Vec<u8> {
+    let mut e = offset.to_be_bytes().to_vec();
+    if magic == b"WIA\x01" {
+        e.extend(size.to_be_bytes());
+    } else {
+        e.extend((size | flag).to_be_bytes());
+        e.extend(packed.to_be_bytes());
+    }
+    e
+}
+
+/// Writes the compression method and its `compr_data` into header 2 at `h2` (the offset of header 2 in `out`).
+pub fn put_compression(out: &mut [u8], h2: usize, method: u32) {
+    out[h2 + 4..h2 + 8].copy_from_slice(&method.to_be_bytes());
+    let data = compr_data(method);
+    out[h2 + 0xD4] = data.len() as u8;
+    out[h2 + 0xD5..h2 + 0xD5 + data.len()].copy_from_slice(&data);
+}
+
 /// How an RVZ is laid out for a test.
 #[derive(Debug, Clone, Copy)]
 pub struct RvzOptions {
-    /// 0 (stored) or 5 (zstd).
+    /// 0 (stored), 2 (bzip2), 3 (LZMA), 4 (LZMA2) or 5 (zstd).
     pub compression: u32,
     /// Group size in bytes.
     pub chunk: usize,
@@ -230,7 +297,7 @@ impl Default for RvzOptions {
 /// `disc` as an RVZ: one raw data entry from 0x80 (the first 0x80 bytes live in header 2), groups of `chunk` bytes
 /// counted from 0. A group whose bytes are all zero is stored empty. `magic` is the first four bytes (`RVZ\x01`).
 pub fn rvz(disc: &[u8], o: RvzOptions, magic: &[u8; 4]) -> Vec<u8> {
-    let compress = |b: &[u8]| if o.compression == 0 { b.to_vec() } else { zstd(b) };
+    let compress = |b: &[u8]| compress(o.compression, b);
     let chunk = o.chunk;
     let groups = disc.len().div_ceil(chunk);
     let body_start = 0x48 + 0xDC;
@@ -270,7 +337,11 @@ pub fn rvz(disc: &[u8], o: RvzOptions, magic: &[u8; 4]) -> Vec<u8> {
     // Group entries are compressed as one block whose size depends on their offsets: lay the group data after a
     // slot big enough for the worst case.
     let slot = {
-        let worst = if o.compression == 0 { groups * 12 } else { groups * 12 + groups * 12 / 8 + 64 };
+        let worst = match o.compression {
+            0 => groups * 12,
+            5 => groups * 12 + groups * 12 / 8 + 64,
+            _ => groups * 24 + 256,
+        };
         (worst + 3) & !3
     };
     let groups_start = (body_start + raw_stored.len() + 3) & !3;
@@ -279,9 +350,8 @@ pub fn rvz(disc: &[u8], o: RvzOptions, magic: &[u8; 4]) -> Vec<u8> {
     let mut offsets = Vec::new();
     for g in 0..groups {
         let empty = group_data[g].is_empty();
-        entries.extend((if empty { 0 } else { (data_at >> 2) as u32 }).to_be_bytes());
-        entries.extend((if empty { 0 } else { group_data[g].len() as u32 | flags[g] }).to_be_bytes());
-        entries.extend(packed_sizes[g].to_be_bytes());
+        let (at, len) = if empty { (0, 0) } else { ((data_at >> 2) as u32, group_data[g].len() as u32) };
+        entries.extend(group_entry(magic, at, len, flags[g], packed_sizes[g]));
         offsets.push(data_at);
         data_at += (group_data[g].len() + 3) & !3;
     }
@@ -296,7 +366,6 @@ pub fn rvz(disc: &[u8], o: RvzOptions, magic: &[u8; 4]) -> Vec<u8> {
     out[0x2C..0x34].copy_from_slice(&(data_at as u64).to_be_bytes());
     let h2 = |out: &mut Vec<u8>, at: usize, v: &[u8]| out[0x48 + at..0x48 + at + v.len()].copy_from_slice(v);
     h2(&mut out, 0, &o.disc_type.to_be_bytes());
-    h2(&mut out, 4, &o.compression.to_be_bytes());
     h2(&mut out, 8, &5u32.to_be_bytes());
     h2(&mut out, 0xC, &(chunk as u32).to_be_bytes());
     h2(&mut out, 0x10, &disc[..0x80]);
@@ -307,6 +376,7 @@ pub fn rvz(disc: &[u8], o: RvzOptions, magic: &[u8; 4]) -> Vec<u8> {
     h2(&mut out, 0xC8, &(groups_start as u64).to_be_bytes());
     h2(&mut out, 0xD0, &(groups_stored.len() as u32).to_be_bytes());
     out[body_start..body_start + raw_stored.len()].copy_from_slice(&raw_stored);
+    put_compression(&mut out, 0x48, o.compression);
     out[groups_start..groups_start + groups_stored.len()].copy_from_slice(&groups_stored);
     for g in 0..groups {
         out[offsets[g]..offsets[g] + group_data[g].len()].copy_from_slice(&group_data[g]);

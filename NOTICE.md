@@ -247,6 +247,14 @@ License: MIT OR Apache-2.0. Text: [cb805eff9e], [23f18e03dc].
     (c) You must retain, in the Source form of any Derivative Works
     Copyright (c) 2014 The Rust Project Developers
 
+### lzma-rust2 0.25.0
+
+License: Apache-2.0. Text: [193c816138].
+
+    copyright notice that is included in or attached to the work
+    copyright license to reproduce, prepare Derivative Works of,
+    (c) You must retain, in the Source form of any Derivative Works
+
 ### md5 0.8.1
 
 License: Apache-2.0 OR MIT. Text: [ce16627041].
@@ -1060,7 +1068,7 @@ SOFTWARE.
 
 ### [193c816138]
 
-Used by: encoding_rs 0.8.35.
+Used by: encoding_rs 0.8.35, lzma-rust2 0.25.0.
 
 ```text
 Apache License

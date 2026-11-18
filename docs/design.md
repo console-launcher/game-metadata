@@ -461,8 +461,8 @@ against an optional private reference set that is not part of this repository (i
 |---|---|---|
 | `threeds` | `.3ds .cci .cxi .app .cia` | titles (12 languages), publisher, icons, ids, regions, ratings, banner extent |
 | `nds` | `.nds .dsi .srl .ids`, first ROM of a `.zip` | titles (up to 8), icon, DSi animated icon + banner block, game code, maker, ratings |
-| `gc` | `.iso .gcm .ciso .gcz .rvz` (a `.wia` GameCube disc gives nothing) | `opening.bnr` (BNR1/BNR2) titles, banner image, region, header title, game id |
-| `wii` | the disc containers + `.wbfs .wia`, `.wad` | header title, game id, region; from an RVZ also `opening.bnr` titles and the logo; WAD title id and game id |
+| `gc` | `.iso .gcm .ciso .gcz .rvz .wia` | `opening.bnr` (BNR1/BNR2) titles, banner image, region, header title, game id |
+| `wii` | the disc containers + `.wbfs .wia`, `.wad` | header title, game id, region; from an RVZ or WIA (any compression) also `opening.bnr` titles and the logo; WAD title id and game id |
 | `wii::banner` | `meta/banner.bin` (plain, LZ77 or IMD5), an `opening.bnr` or `00000000.app`, the RVZ's banner | the channel banner's layout, animations and textures; frames drawn on the CPU at any scale; counts of panes not drawn |
 | `ids` | by extension: `.iso` (PS1/PS2 serial from `SYSTEM.CNF`, PSP `PARAM.SFO`, GC/Wii id), `.bin/.img` (raw 2048 or 2352-byte sectors, mode 1 or 2), `.cue` (first data track via the opener), `.pbp`, `.chd`, `.zip`, `.nsp`, `.xbe`, `.wad`, `.3ds`/`.cia`, `.rpx`/`.wua`, the GC/Wii containers; RA hashing by name | serial (normalized `SLUS00003`), game id, title id, CHD raw SHA-1, zip ROM CRC-32 + size, PSP title + disc id, Xbox title id, RA MD5, disc id with region/console or the reason for none |
 | `wiiu` | unpacked title (via `.rpx`), `.wua` | titles (12), publisher, ids, region, icon, boot media sizes, splashes on demand |
@@ -501,7 +501,7 @@ Cartridge readers (facts only, from each console's public header documentation; 
   allocates up to its cap); case-insensitive path matching is ASCII only.
 - Not ported, because the core does no I/O: `RelativePath` and `WiiUFolderFiles` (an app resolves `../meta/...` and
   opens folders; the core gives it `TitleFiles` / `OpenerFiles`, and the CLI shows the pattern).
-- A WIA's groups need bzip2 or LZMA, which are not linked (see Dependencies): a Wii WIA gives its header only, a GameCube WIA nothing.
+- A WIA reads like an RVZ: its groups are bzip2 (an own decoder, `bzip2.rs`), LZMA or LZMA2 (`lzma-rust2`, no_std) as well as zstd or stored. An LZMA stream has no end marker, so a group is decoded twice: once for a prefix that gives its size (the exception lists and the sector count), once to that size.
 
 ### Wii banners: what replaces what
 

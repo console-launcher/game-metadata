@@ -7,8 +7,8 @@
 //!
 //! - every disc format gives the disc header: game id, maker, internal title and region (the Wii magic 0x5D1C9EA3 tells
 //!   it from a GameCube disc);
-//! - an RVZ stores the game partition decrypted, so its file system is walked for `opening.bnr` (IMET titles per
-//!   language and the title logo); a WIA's groups need bzip2 or LZMA, an ISO's, WBFS's, CISO's and GCZ's partitions are
+//! - an RVZ or a WIA (zstd, bzip2, LZMA, LZMA2 or stored groups) keeps the game partition decrypted, so its file system is
+//!   walked for `opening.bnr` (IMET titles per language and the title logo); an ISO's, WBFS's, CISO's and GCZ's partitions are
 //!   encrypted: those give the header only;
 //! - a WAD gives its title id (and the 4 character game id inside it) from the plain header and title metadata.
 //!
@@ -108,7 +108,7 @@ pub(crate) fn disc_header<S: ByteSource + ?Sized>(source: &mut S, len: u64) -> R
 }
 
 fn read_disc<S: ByteSource + ?Sized>(source: &mut S) -> Result<Option<GameInfo>, ReadError> {
-    let is_rvz = fetch_opt(source, 0, 4)?.is_some_and(|m| &m[..] == b"RVZ\x01");
+    let is_rvz = fetch_opt(source, 0, 4)?.is_some_and(|m| matches!(&m[..], b"RVZ\x01" | b"WIA\x01"));
     let header = disc_header(source, HEADER)?;
     let Some(header) = header else { return Ok(None) };
     if header[0x18..0x1C] != WII_MAGIC {
@@ -171,7 +171,7 @@ const MAX_BANNER_FILE: u64 = 16 << 20;
 /// content. `Ok(None)` when there is none; only a failing source is an error. Whether the archive holds a readable banner is
 /// [`banner::WiiBanner::open`]'s to say.
 pub fn channel_banner_archive<S: ByteSource + ?Sized>(source: &mut S) -> Result<Option<Vec<u8>>, ReadError> {
-    if fetch_opt(source, 0, 4)?.is_some_and(|m| &m[..] == b"RVZ\x01") {
+    if fetch_opt(source, 0, 4)?.is_some_and(|m| matches!(&m[..], b"RVZ\x01" | b"WIA\x01")) {
         return channel_banner_bin(source);
     }
     let size = source.size();
@@ -191,7 +191,8 @@ pub fn open_channel_banner<S: ByteSource + ?Sized>(source: &mut S) -> Result<Opt
 /// banner). `None` for any other file, a missing banner or one that does not parse. Not part of [`read`](crate::read): the
 /// picture is drawn on demand.
 pub fn channel_banner<S: ByteSource + ?Sized>(source: &mut S, file_name: &str) -> Option<RgbaImage> {
-    if !file_name.rsplit_once('.').is_some_and(|(_, e)| e.eq_ignore_ascii_case("rvz")) {
+    if !file_name.rsplit_once('.').is_some_and(|(_, e)| e.eq_ignore_ascii_case("rvz") || e.eq_ignore_ascii_case("wia"))
+    {
         return None;
     }
     open_channel_banner(source).ok()??.poster(1.0)

@@ -5,7 +5,7 @@
 //! Synthetic Wii data: TPL, U8, LZ77, IMET `opening.bnr`, a partition's file system, discs, WBFS, WADs and an RVZ of a
 //! Wii disc. Mirrors the original reader's `WiiFixture`/`WiiRvzFixture`. No commercial data.
 
-use crate::gc::zstd;
+use crate::gc::{compress as compress_with, group_entry, put_compression};
 
 fn be32(v: u32) -> [u8; 4] {
     v.to_be_bytes()
@@ -411,7 +411,7 @@ pub struct WiiRvzOptions<'a> {
     pub game_id: &'a str,
     /// The disc header's title.
     pub title: &'a str,
-    /// 0 stored, 5 zstd (2 with the WIA magic: bzip2/LZMA data that is never read).
+    /// 0 stored, 2 bzip2, 3 LZMA, 4 LZMA2, 5 zstd (the WIA magic and any method make a WIA: 8 byte group entries).
     pub compression: u32,
     /// Group size.
     pub chunk: usize,
@@ -449,7 +449,7 @@ pub struct WiiRvz {
 /// An RVZ of a Wii disc: raw data up to the first partition's data, then that partition's decrypted data in groups.
 pub fn rvz(partition: &[u8], o: &WiiRvzOptions) -> WiiRvz {
     let prefix = disc_prefix(o.game_id, o.title);
-    let compress = |b: &[u8]| if o.compression == 0 { b.to_vec() } else { zstd(b) };
+    let compress = |b: &[u8]| compress_with(o.compression, b);
     let chunk = o.chunk;
     let raw_groups = prefix.len().div_ceil(chunk);
     let sectors_per_group = chunk / 0x8000;
@@ -503,7 +503,7 @@ pub fn rvz(partition: &[u8], o: &WiiRvzOptions) -> WiiRvz {
         } else {
             let mut all = ex;
             all.extend(body);
-            stored.push(zstd(&all));
+            stored.push(compress_with(o.compression, &all));
             flags.push(1 << 31);
         }
         packed_sizes.push(packed_size);
@@ -537,7 +537,11 @@ pub fn rvz(partition: &[u8], o: &WiiRvzOptions) -> WiiRvz {
     let part_at = (raw_at + raw_stored.len() + 3) & !3;
     let groups_at = (part_at + 48 + 3) & !3;
     let slot = {
-        let worst = if o.compression == 0 { groups * 12 } else { groups * 12 + groups * 12 / 8 + 64 };
+        let worst = match o.compression {
+            0 => groups * 12,
+            5 => groups * 12 + groups * 12 / 8 + 64,
+            _ => groups * 24 + 256,
+        };
         (worst + 3) & !3
     };
     let mut data_at = groups_at + slot;
@@ -545,9 +549,8 @@ pub fn rvz(partition: &[u8], o: &WiiRvzOptions) -> WiiRvz {
     let mut offsets = Vec::new();
     for g in 0..groups {
         let empty = stored[g].is_empty();
-        entries.extend((if empty { 0 } else { (data_at >> 2) as u32 }).to_be_bytes());
-        entries.extend((if empty { 0 } else { stored[g].len() as u32 | flags[g] }).to_be_bytes());
-        entries.extend(packed_sizes[g].to_be_bytes());
+        let (at, len) = if empty { (0, 0) } else { ((data_at >> 2) as u32, stored[g].len() as u32) };
+        entries.extend(group_entry(o.magic, at, len, flags[g], packed_sizes[g]));
         offsets.push(data_at);
         data_at += (stored[g].len() + 3) & !3;
     }
@@ -561,7 +564,6 @@ pub fn rvz(partition: &[u8], o: &WiiRvzOptions) -> WiiRvz {
     put(&mut out, 0x24, &0x100_0000u64.to_be_bytes());
     put(&mut out, 0x2C, &(data_at as u64).to_be_bytes());
     put(&mut out, 0x48, &be32(2));
-    put(&mut out, 0x4C, &be32(o.compression));
     put(&mut out, 0x50, &be32(5));
     put(&mut out, 0x54, &be32(chunk as u32));
     put(&mut out, 0x58, &prefix[..0x80]);
@@ -574,6 +576,7 @@ pub fn rvz(partition: &[u8], o: &WiiRvzOptions) -> WiiRvz {
     put(&mut out, 0x48 + 0xC4, &be32(groups as u32));
     put(&mut out, 0x48 + 0xC8, &(groups_at as u64).to_be_bytes());
     put(&mut out, 0x48 + 0xD0, &be32(groups_stored.len() as u32));
+    put_compression(&mut out, 0x48, o.compression);
     put(&mut out, raw_at, &raw_stored);
     put(&mut out, part_at, &part);
     put(&mut out, groups_at, &groups_stored);

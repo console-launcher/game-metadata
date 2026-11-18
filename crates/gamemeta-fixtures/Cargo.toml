@@ -37,6 +37,9 @@ gamemeta-json.workspace = true
 # compressor side is only here).
 miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
 ruzstd = "0.9"
+# The compressors behind the WIA bzip2 and LZMA fixtures (the readers only decode, in their own code or lzma-rust2).
+bzip2 = "0.6"
+lzma-rust2 = "0.25"
 encoding_rs = "0.8"
 # A headless GLES 3 context for the GL renderer tests and bench (EGL, loaded at run time).
 khronos-egl = { version = "6.0.0", features = ["dynamic"], optional = true }

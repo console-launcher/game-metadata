@@ -15,8 +15,8 @@ game-metadata is an independent project. It is not affiliated with, authorized, 
 |---|---|---|
 | `threeds` | `.3ds .cci .cxi .app .cia` | titles (12 languages), publisher, icons, ids, regions, ratings, banner extent |
 | `nds` | `.nds .dsi .srl .ids`, first ROM of a `.zip` | titles (up to 8), icon, DSi animated icon + banner block, game code, maker, ratings |
-| `gc` | `.iso .gcm .ciso .gcz .rvz` (a `.wia` GameCube disc gives nothing) | `opening.bnr` (BNR1/BNR2) titles, banner image, region, header title, game id |
-| `wii` | the disc containers + `.wbfs .wia`, `.wad` | header title, game id, region; from an RVZ also `opening.bnr` titles and the logo; WAD title id and game id |
+| `gc` | `.iso .gcm .ciso .gcz .rvz .wia` | `opening.bnr` (BNR1/BNR2) titles, banner image, region, header title, game id |
+| `wii` | the disc containers + `.wbfs .wia`, `.wad` | header title, game id, region; from an RVZ or WIA (any compression) also `opening.bnr` titles and the logo; WAD title id and game id |
 | `ids` | by extension: `.iso` (PS1/PS2 serial from `SYSTEM.CNF`, PSP `PARAM.SFO`, GC/Wii id), `.bin/.img` (raw 2048 or 2352-byte sectors, mode 1 or 2), `.cue` (first data track via the opener), `.pbp`, `.chd`, `.zip`, `.nsp`, `.xbe`, `.wad`, `.3ds`/`.cia`, `.rpx`/`.wua`, the GC/Wii containers; RA hashing by name | serial (normalized `SLUS00003`), game id, title id, CHD raw SHA-1, zip ROM CRC-32 + size, PSP title + disc id, Xbox title id, RA MD5, disc id with region/console or the reason for none |
 | `carts` | Game Boy / Color `.gb .gbc .sgb`, Game Boy Advance `.gba .agb`, Nintendo 64 `.z64 .v64 .n64`, SNES `.sfc .smc .swc .fig`, NES `.nes`, Genesis / 32X `.md .gen .smd .32x` (and a Genesis `.bin`), Master System / Game Gear `.sms .gg`, or one ROM in a `.zip` | title, game code, maker, version, regions and every header field as JSON; header checks (checksum matching is a separate opt-in call) |
 | `wiiu` | unpacked title (via `.rpx`), `.wua` | titles (12), publisher, ids, region, icon, boot media sizes, splashes on demand |

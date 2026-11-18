@@ -233,12 +233,11 @@ fn rvz_packed_groups_read_junk_runs_as_zeros() {
 }
 
 #[test]
-fn a_wia_an_unsupported_compression_and_a_truncated_rvz_give_nothing() {
+fn an_unsupported_compression_and_a_truncated_rvz_give_nothing() {
     assert!(read(&rvz(&rvz_disc(), fx::RvzOptions::default())).is_some());
-    assert!(read(&fx::rvz(&rvz_disc(), fx::RvzOptions::default(), b"WIA\x01")).is_none());
-    let mut lzma = rvz(&rvz_disc(), fx::RvzOptions::default());
-    lzma[0x4C + 3] = 3;
-    assert!(read(&lzma).is_none());
+    let mut unknown = rvz(&rvz_disc(), fx::RvzOptions::default());
+    unknown[0x4C + 3] = 9;
+    assert!(read(&unknown).is_none());
     let good = rvz(&rvz_disc(), fx::RvzOptions::default());
     assert!(read(&good[..good.len() / 2]).is_none());
     assert!(read(&good[..0x60]).is_none());
@@ -272,4 +271,17 @@ fn reading_a_title_from_a_2_mib_chunk_rvz_does_not_read_the_whole_file() {
     let info = gc::read_info(&mut src).unwrap();
     assert_eq!(info.title(), Some("Wind Quest"));
     assert!(src.1 < file.len() as u64 / 2, "read {} of {} bytes", src.1, file.len());
+}
+
+#[test]
+fn an_lzma_or_lzma2_rvz_and_a_wia_of_any_method_read_like_the_plain_disc() {
+    for method in [2, 3, 4, 5, 0] {
+        for magic in [b"RVZ\x01", b"WIA\x01"] {
+            let o = fx::RvzOptions { compression: method, ..Default::default() };
+            let info = read(&fx::rvz(&rvz_disc(), o, magic)).unwrap_or_else(|| panic!("{magic:?} method {method}"));
+            assert_eq!(info.title(), Some("Wind Quest"), "{magic:?} method {method}");
+            assert_eq!(info.ids.game_id.as_deref(), Some("GZLE01"));
+            assert!(info.icon.is_some());
+        }
+    }
 }

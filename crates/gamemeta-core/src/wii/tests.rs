@@ -414,15 +414,46 @@ fn a_wbfs_gives_the_header_fields_from_its_disc_info() {
 }
 
 #[test]
-fn a_wia_gives_the_header_fields_from_its_disc_header_copy_whatever_its_compression() {
+fn a_wia_with_bzip2_lzma_or_lzma2_groups_reads_like_an_rvz() {
+    for method in [2, 3, 4] {
+        let wia = rvz_with(&partition(), |o| {
+            o.magic = b"WIA\x01";
+            o.compression = method;
+        });
+        let info = read(&wia.bytes).unwrap_or_else(|| panic!("method {method}"));
+        assert_eq!(info.ids.game_id.as_deref(), Some("RZDE01"), "method {method}");
+        assert_eq!(info.header_title.as_deref(), Some("Header Title"), "method {method}");
+        assert_eq!(info.title(), Some("Test Quest"), "WIA method {method} titles");
+        assert!(info.icon.is_some(), "WIA method {method} logo");
+    }
+}
+
+#[test]
+fn a_stored_wia_reads_too_and_an_rvz_with_lzma_groups_decodes() {
     let wia = rvz_with(&partition(), |o| {
         o.magic = b"WIA\x01";
-        o.compression = 2;
+        o.compression = 0;
     });
-    let info = read(&wia.bytes).unwrap();
+    assert_eq!(read(&wia.bytes).unwrap().title(), Some("Test Quest"));
+    for method in [3, 4, 2] {
+        let rvz = rvz_with(&partition(), |o| o.compression = method);
+        assert_eq!(read(&rvz.bytes).unwrap().title(), Some("Test Quest"), "RVZ method {method}");
+    }
+}
+
+#[test]
+fn a_wia_with_unknown_compression_or_cut_groups_gives_the_header_only() {
+    let wia = rvz_with(&partition(), |o| {
+        o.magic = b"WIA\x01";
+        o.compression = 3;
+    });
+    let mut unknown = wia.bytes.clone();
+    unknown[0x4C + 3] = 9; // a method no reader here knows
+    let info = read(&unknown).unwrap_or_else(|| panic!("header copy still reads"));
     assert_eq!(info.ids.game_id.as_deref(), Some("RZDE01"));
-    assert_eq!(info.header_title.as_deref(), Some("Header Title"));
-    assert!(info.titles.is_empty(), "a WIA's groups need bzip2 or LZMA: header only");
+    assert!(info.titles.is_empty());
+    let cut = &wia.bytes[..wia.bytes.len() - 40];
+    assert!(read(cut).is_none_or(|i| i.titles.is_empty()));
 }
 
 #[test]

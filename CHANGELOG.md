@@ -3,6 +3,11 @@
 Notable changes per release. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/). `scripts/publish` uses the section of the version it releases as the release notes.
 
+## [Unreleased]
+
+- WIA images read like RVZ: bzip2, LZMA and LZMA2 groups decode (own bzip2 decoder, `lzma-rust2`), so a WIA gives its `opening.bnr`
+  titles and logo, and an LZMA or bzip2 RVZ decodes too.
+
 ## [0.7.1]
 
 - Wii channel banners now draw shipped banners: the material flag counts (low nibbles) and the optional blocks after them, a single

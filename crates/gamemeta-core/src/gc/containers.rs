@@ -23,14 +23,13 @@ pub(crate) type Disc<'a> = Box<dyn ByteSource + 'a>;
 
 const GCZ_MAGIC: [u8; 4] = [0x01, 0xC0, 0x0B, 0xB1];
 
-/// The disc inside `source`; `Ok(None)` for a container this module cannot read (WIA included).
+/// The disc inside `source`; `Ok(None)` for a container this module cannot read.
 pub(crate) fn open<'a, S: ByteSource + ?Sized>(source: &'a mut S) -> Result<Option<Disc<'a>>, ReadError> {
     let Some(magic) = fetch_opt(source, 0, 4)? else { return Ok(None) };
     Ok(match &magic[..] {
         b"CISO" => Ciso::open(source)?.map(|d| Box::new(d) as Disc<'a>),
         m if m == GCZ_MAGIC => Gcz::open(source)?.map(|d| Box::new(d) as Disc<'a>),
-        b"RVZ\x01" => Rvz::open(source)?.map(|d| Box::new(d) as Disc<'a>),
-        b"WIA\x01" => None,
+        b"RVZ\x01" | b"WIA\x01" => Rvz::open(source)?.map(|d| Box::new(d) as Disc<'a>),
         _ => Some(Box::new(source) as Disc<'a>),
     })
 }

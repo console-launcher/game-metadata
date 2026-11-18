@@ -18,6 +18,8 @@ miniz_oxide = { version = "0.9", default-features = false, features = ["with-all
 
 # Zstd decoding (RVZ groups, ZArchive blocks): pure Rust, no_std + alloc, no checksum feature. MIT.
 ruzstd = { version = "0.9", default-features = false }
+# Raw LZMA and LZMA2 decoding (WIA groups): pure Rust, no_std + alloc, no dependencies without the xz feature. Apache-2.0.
+lzma-rust2 = { version = "0.25", default-features = false }
 # Shift_JIS decoding of Japanese disc banners (windows-1252 is a 32-entry table in the reader). (Apache-2.0 OR MIT) AND BSD-3-Clause.
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc"] }
 
