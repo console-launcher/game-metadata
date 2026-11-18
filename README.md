@@ -3,6 +3,8 @@
 Read titles, icons, ids and art from game files, and render Nintendo 3DS HOME banners. A Rust core (`no_std` + `alloc`,
 no I/O of its own) with a C API, Kotlin bindings (Android and desktop JVM) and a command-line tool.
 
+Try it in your browser: https://console-launcher.github.io/game-metadata/
+
 It reads files you own.
 
 game-metadata is an independent project. It is not affiliated with, authorized, sponsored or endorsed by Nintendo, Sony, Microsoft, Sega or any other game or console company. Nintendo 3DS, Nintendo 3DS HOME Menu, Wii, Wii U, Game Boy, Nintendo DS, GameCube, PlayStation, Xbox, Sega Genesis, Mega Drive, Master System and Game Gear, and the other console, format and game names used here, are trademarks of their respective owners and are used only to say which file formats the library reads. The project contains no game data, keys or console firmware and never unlocks protected files.
@@ -122,6 +124,8 @@ cargo run -p gamemeta-cli -- render game.3ds -o banner.png  # a banner frame
 ```
 
 ## Website
+
+Live demo: https://console-launcher.github.io/game-metadata/
 
 `site/` is a one-page static viewer: it reads files you pick or drop (or a whole Wii U title folder, or a folder of ROMs) with this
 library compiled to WebAssembly, and has a "Try a demo" button (the files in `demo/` plus the fixtures; list credits one per
