@@ -7,6 +7,7 @@ Notable changes per release. Format: [Keep a Changelog](https://keepachangelog.c
 
 - WIA images read like RVZ: bzip2, LZMA and LZMA2 groups decode (own bzip2 decoder, `lzma-rust2`), so a WIA gives its `opening.bnr`
   titles and logo, and an LZMA or bzip2 RVZ decodes too.
+- A WAD in the backup (`Bk`) layout, or any header the sizes do not place, gives its title id from the TMD found by its shape.
 
 ## [0.7.1]
 

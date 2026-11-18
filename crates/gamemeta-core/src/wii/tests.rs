@@ -611,3 +611,23 @@ fn a_wad_gives_its_title_id_and_game_id_and_no_titles_or_art() {
     assert_eq!(info.ids.game_id.as_deref(), Some("REAE"));
     assert!(info.titles.is_empty() && info.icon.is_none());
 }
+
+// ---- a WAD in the backup layout
+
+#[test]
+fn a_backup_layout_wad_still_gives_its_title_id_from_the_tmd() {
+    let wad = gamemeta_fixtures::ids::wad_backup(0x0001_0001_5245_4145);
+    let info = read_wad_info(&mut SliceSource::new(&wad)).expect("a Bk WAD has a TMD");
+    assert_eq!(info.ids.title_id.as_deref(), Some("0001000152454145"));
+    assert_eq!(info.ids.game_id.as_deref(), Some("REAE"));
+}
+
+#[test]
+fn a_backup_layout_wad_without_a_tmd_gives_nothing() {
+    let mut wad = gamemeta_fixtures::ids::wad_backup(0x0001_0001_5245_4145);
+    wad[0x80..0x80 + 0x200].fill(0);
+    assert!(read_wad_info(&mut SliceSource::new(&wad)).is_none());
+    let mut noise = gamemeta_fixtures::ids::wad_backup(1);
+    noise[0x80 + 0x140..0x80 + 0x160].fill(b'x'); // no certificate issuer: not a TMD
+    assert!(read_wad_info(&mut SliceSource::new(&noise)).is_none());
+}

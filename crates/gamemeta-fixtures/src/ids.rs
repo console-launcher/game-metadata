@@ -385,3 +385,17 @@ pub fn sample_nes() -> Vec<u8> {
 pub fn sample_xbe() -> Vec<u8> {
     xbe(0x4D53_0004, 1, 0x10000, 0x178)
 }
+
+/// A WAD in the backup layout: a 0x70 byte `Bk` header (the field layout is not read), then the TMD at the next 64 byte
+/// boundary, signed RSA-2048, issued by a CP certificate, holding `title_id` at 0x18C.
+pub fn wad_backup(title_id: u64) -> Vec<u8> {
+    let tmd = 0x80;
+    let mut b = vec![0u8; tmd + 0x208 + 0x40];
+    b[..4].copy_from_slice(&0x70u32.to_be_bytes());
+    b[4..6].copy_from_slice(b"Bk");
+    b[6..8].copy_from_slice(&1u16.to_be_bytes());
+    b[tmd..tmd + 4].copy_from_slice(&0x0001_0001u32.to_be_bytes());
+    b[tmd + 0x140..tmd + 0x140 + 26].copy_from_slice(b"Root-CA00000001-CP00000004");
+    b[tmd + 0x18C..tmd + 0x194].copy_from_slice(&title_id.to_be_bytes());
+    b
+}
