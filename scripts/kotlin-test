@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Builds the host JNI library and runs the Kotlin binding's tests against it and the committed fixture.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+cargo build -p gamemeta-jni --quiet
+lib="$PWD/target/debug/libgamemeta_jni.so"
+[[ "$(uname)" == Darwin ]] && lib="$PWD/target/debug/libgamemeta_jni.dylib"
+cd bindings/kotlin
+./gradlew --no-daemon -q test -PgamemetaLibrary="$lib" -PgamemetaFixtures="$PWD/../../fixtures"

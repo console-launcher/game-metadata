@@ -1,0 +1,28 @@
+[package]
+name = "banner3ds-gles"
+description = "An OpenGL ES 3.0 / WebGL 2 renderer for 3DS HOME banners (a banner3ds-scene scene) through a GL function table the caller fills."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+gamemeta-core.workspace = true
+banner3ds-scene.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+gamemeta-core = { workspace = true, features = ["std"] }
+gamemeta-fixtures = { workspace = true, features = ["gl"] }
+banner3ds-soft.workspace = true
+
+[[test]]
+name = "headless"
+harness = false
+
+[[bench]]
+name = "frames"
+harness = false

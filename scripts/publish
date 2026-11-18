@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+"""Publish a release: build every asset, tag, create the GitHub release. See docs/releasing.md.
+  scripts/publish <version>         dry run (the default): checks the gates, builds the assets into dist/, prints every step and
+                                    what it would do; tags, pushes and uploads nothing. Exit 0 even when a gate would refuse.
+  scripts/publish <version> --go    the real thing; refuses (exit 1, before building anything) unless all gates hold:
+    - the repository is PUBLIC (`gh repo view`)
+    - the optional time check passes (PUBLISH_TIME_CHECK, below)
+    - the working tree is clean and HEAD has the same tree as origin/main (push main first)
+    - <version> is the version in Cargo.toml and in bindings/kotlin/build.gradle.kts
+    - CHANGELOG.md has a section for it (the release notes)
+    - the optional history check passes on a clone of origin (PUBLISH_HISTORY_CHECK, below)
+    - a tag v<version> on origin points at origin/main's commit, or does not exist
+Assets (dist/game-metadata-<version>/): the AAR, host jar, header, LICENSE, NOTICE.md (scripts/release), the Linux x86_64 CLI
+tarball, the wasm zip, the JitPack POM, and one SHA256SUMS over all of them. Re-running for an existing tag uploads only the
+assets the release lacks (never --clobber). Nothing else here changes a repository setting.
+
+Optional hooks, both unset by default (then their gates pass as "not configured"). Each is a command line; a non-zero exit refuses:
+  PUBLISH_TIME_CHECK      run as `<command>` before the tag push and before the release is touched
+  PUBLISH_HISTORY_CHECK   run as `<command> <path of a bare clone of origin>`
+They can be exported, or set one per line as NAME=value in an untracked `.publish.local` at the repository root (read if present;
+an exported variable wins). PUBLISH_NOW (an ISO time) overrides the clock used for the tag date, for tests."""
+import datetime
+import gzip
+import hashlib
+import os
+import re
+import subprocess
+import sys
+import tarfile
+import shlex
+import tempfile
+import zipfile
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+
+class Refuse(Exception):
+    pass
+
+
+def run(*cmd, check=True, **kw):
+    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, **kw)
+    if check and r.returncode:
+        raise Refuse("%s failed: %s" % (" ".join(cmd[:3]), (r.stderr or r.stdout).strip()))
+    return r
+
+
+def now_utc():
+    v = os.environ.get("PUBLISH_NOW")  # clock override (tests)
+    if v:
+        return datetime.datetime.fromisoformat(v.strip().replace("Z", "+00:00")).astimezone(datetime.timezone.utc)
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def read(path):
+    with open(os.path.join(ROOT, path), encoding="utf-8") as f:
+        return f.read()
+
+
+def first(pattern, text):
+    m = re.search(pattern, text, re.M)
+    return m.group(1) if m else None
+
+
+def origin_repo():
+    """(owner, repo) from origin's configured URL (not git's insteadOf-rewritten one)."""
+    url = run("git", "config", "--get", "remote.origin.url").stdout.strip()
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$", url)
+    if not m:
+        raise Refuse("origin is not a GitHub URL: %s" % url)
+    return m.group(1), m.group(2)
+
+
+# ---------------------------------------------------------------- gates
+def load_local():
+    """NAME=value lines of the untracked .publish.local, for the names not already in the environment."""
+    path = os.path.join(ROOT, ".publish.local")
+    if not os.path.exists(path):
+        return
+    for line in read(".publish.local").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            name, value = line.split("=", 1)
+            os.environ.setdefault(name.strip(), value.strip().strip("'\""))
+
+
+def hook(var, *extra):
+    """(ok, message) of the optional command in $var; ok when it is unset."""
+    cmd = os.environ.get(var)
+    if not cmd:
+        return True, "not configured"
+    try:
+        r = run(*shlex.split(cmd), *extra, check=False)
+    except FileNotFoundError:
+        return False, "%s: %s is not installed" % (var, shlex.split(cmd)[0])
+    return r.returncode == 0, (r.stdout + r.stderr).strip()
+
+
+def time_check():
+    return hook("PUBLISH_TIME_CHECK")
+
+
+def changelog_notes(version):
+    """The CHANGELOG.md section of `version` (without its heading), or None."""
+    out, inside = [], False
+    for line in read("CHANGELOG.md").splitlines():
+        if line.startswith("## "):
+            if inside:
+                break
+            inside = re.match(r"## \[?v?%s\]?(\s|$)" % re.escape(version), line) is not None
+        elif inside:
+            out.append(line)
+    text = "\n".join(out).strip()
+    return text or None
+
+
+def remote_tag(tag):
+    """The commit origin's `tag` points at, or None. Peels an annotated tag."""
+    r = run("git", "ls-remote", "origin", "refs/tags/%s" % tag, "refs/tags/%s^{}" % tag, check=False)
+    sha = None
+    for line in r.stdout.splitlines():
+        s, ref = line.split("\t")
+        if ref.endswith("^{}") or sha is None:
+            sha = s
+    return sha
+
+
+def gates(version):
+    """[(name, ok, detail)], every gate evaluated. Read-only."""
+    results = []
+
+    def gate(name, ok, detail):
+        results.append((name, bool(ok), detail))
+
+    try:
+        vis = run("gh", "repo", "view", "--json", "visibility", "-q", ".visibility", check=False)
+        v = vis.stdout.strip()
+        gate("visibility", v == "PUBLIC", "repository is not public (visibility: %s)" % (v or "unknown") if v != "PUBLIC" else "PUBLIC")
+    except FileNotFoundError:
+        gate("visibility", False, "repository is not public (gh is not installed, visibility unknown)")
+    ok, msg = time_check()
+    gate("time check", ok, msg if ok else "the time check refuses: %s" % msg)
+    dirty = run("git", "status", "--porcelain").stdout.strip()
+    gate("clean tree", not dirty, "working tree is not clean:\n    " + dirty.replace("\n", "\n    ") if dirty else "clean")
+    fetched = run("git", "fetch", "-q", "origin", "main", check=False)
+    head_tree = run("git", "rev-parse", "HEAD^{tree}").stdout.strip()
+    main_tree = run("git", "rev-parse", "origin/main^{tree}", check=False).stdout.strip()
+    gate("published", fetched.returncode == 0 and head_tree == main_tree,
+         "HEAD's tree is not origin/main's (push main first; git fetch said: %s)" % fetched.stderr.strip()
+         if head_tree != main_tree or fetched.returncode else "HEAD matches origin/main")
+    cargo = first(r'^version = "(.*)"', read("Cargo.toml"))
+    gradle = first(r'^version = "(.*)"', read("bindings/kotlin/build.gradle.kts"))
+    problems = []
+    if cargo != version:
+        problems.append("Cargo.toml has %s, not %s" % (cargo, version))
+    if gradle != version:
+        problems.append("bindings/kotlin/build.gradle.kts has %s, not %s" % (gradle, version))
+    gate("version", not problems, "; ".join(problems) if problems else version)
+    gate("changelog", changelog_notes(version), "CHANGELOG.md has no section for [%s]" % version
+         if not changelog_notes(version) else "CHANGELOG.md [%s]" % version)
+    with tempfile.TemporaryDirectory(prefix="publish-clone-") as tmp:
+        clone = os.path.join(tmp, "origin.git")
+        c = run("git", "clone", "-q", "--bare", run("git", "remote", "get-url", "origin").stdout.strip(), clone, check=False)
+        if c.returncode:
+            gate("history check", False, "the history check could not clone origin: %s" % c.stderr.strip())
+        else:
+            ok, msg = hook("PUBLISH_HISTORY_CHECK", clone)
+            gate("history check", ok, "the history check failed:\n" + msg if not ok else msg)
+    tag = "v" + version
+    on_origin = remote_tag(tag)
+    main_sha = run("git", "rev-parse", "origin/main", check=False).stdout.strip()
+    gate("tag", on_origin in (None, main_sha),
+         "tag %s on origin points at another commit (%s), not origin/main (%s)" % (tag, (on_origin or "")[:10], main_sha[:10])
+         if on_origin not in (None, main_sha) else ("new" if on_origin is None else "already on origin at origin/main"))
+    return results
+
+
+# ---------------------------------------------------------------- assets
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def make_tarball(path, top, files, mtime):
+    """files: [(name inside top, source path, mode)]. Deterministic: fixed mtime, root owner, gzip header without a time."""
+    with open(path, "wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0, compresslevel=9) as gz, \
+            tarfile.open(fileobj=gz, mode="w", format=tarfile.PAX_FORMAT) as t:
+        d = tarfile.TarInfo(top)
+        d.type, d.mode, d.mtime = tarfile.DIRTYPE, 0o755, mtime
+        t.addfile(d)
+        for name, src, mode in files:
+            ti = tarfile.TarInfo("%s/%s" % (top, name))
+            ti.size, ti.mode, ti.mtime = os.path.getsize(src), mode, mtime
+            with open(src, "rb") as f:
+                t.addfile(ti, f)
+
+
+def make_zip(path, top, files, mtime):
+    stamp = max(1980, datetime.datetime.fromtimestamp(mtime, datetime.timezone.utc).year), 1, 1, 0, 0, 0
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for name, src in files:
+            zi = zipfile.ZipInfo("%s/%s" % (top, name), stamp)
+            zi.compress_type, zi.external_attr = zipfile.ZIP_DEFLATED, 0o644 << 16
+            with open(src, "rb") as f:
+                z.writestr(zi, f.read())
+
+
+def make_pom(version, owner, repo):
+    # The three coordinates come first and once each before any dependency: jitpack.yml rewrites the first occurrence of each.
+    kotlin = first(r'kotlin\("jvm"\) version "(.*)"', read("bindings/kotlin/build.gradle.kts"))
+    if not kotlin:
+        raise Refuse("no kotlin(\"jvm\") version in bindings/kotlin/build.gradle.kts")
+    return """<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.github.%(owner)s</groupId>
+  <artifactId>game-metadata</artifactId>
+  <version>%(version)s</version>
+  <packaging>aar</packaging>
+  <name>game-metadata</name>
+  <description>Read titles, icons, ids and art from game files, and render Nintendo 3DS HOME banners. Kotlin API over a Rust core.</description>
+  <url>https://github.com/%(owner)s/%(repo)s</url>
+  <licenses>
+    <license>
+      <name>MPL-2.0</name>
+      <url>https://www.mozilla.org/MPL/2.0/</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>https://github.com/%(owner)s/%(repo)s</url>
+    <connection>scm:git:https://github.com/%(owner)s/%(repo)s.git</connection>
+  </scm>
+  <dependencies>
+    <dependency>
+      <groupId>org.jetbrains.kotlin</groupId>
+      <artifactId>kotlin-stdlib</artifactId>
+      <version>%(kotlin)s</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+</project>
+""" % dict(owner=owner, repo=repo, version=version, kotlin=kotlin)
+
+
+def build(version):
+    """Run the builds, assemble the extra assets. Returns (dist dir, [asset names])."""
+    out = os.path.join(ROOT, "dist", "game-metadata-%s" % version)
+    print("== build: scripts/release (AAR, host jar, header)")
+    subprocess.run([os.path.join(ROOT, "scripts", "release")], cwd=ROOT, check=True)
+    print("== build: the CLI (cargo build -p gamemeta-cli --release)")
+    subprocess.run(["cargo", "build", "-p", "gamemeta-cli", "--release", "--locked", "--quiet"], cwd=ROOT, check=True)
+    print("== build: the wasm package (scripts/site-build)")
+    subprocess.run([os.path.join(ROOT, "scripts", "site-build")], cwd=ROOT, check=True)
+
+    owner, repo = origin_repo()
+    mtime = int(run("git", "log", "-1", "--format=%ct", "origin/main", check=False).stdout.strip() or 0)
+    lic, notice = os.path.join(ROOT, "LICENSE"), os.path.join(ROOT, "NOTICE.md")
+    top = "gamemeta-%s-x86_64-linux" % version
+    make_tarball(os.path.join(out, top + ".tar.gz"), top,
+                 [("gamemeta", os.path.join(ROOT, "target", "release", "gamemeta"), 0o755), ("LICENSE", lic, 0o644),
+                  ("NOTICE.md", notice, 0o644)], mtime)
+    pkg = os.path.join(ROOT, "site", "dist", "pkg")
+    wasm = [(os.path.relpath(os.path.join(d, n), pkg), os.path.join(d, n))
+            for d, _, ns in sorted(os.walk(pkg)) for n in sorted(ns)]
+    wasm += [("LICENSE", lic), ("NOTICE.md", notice)]
+    make_zip(os.path.join(out, "gamemeta-wasm-%s.zip" % version), "gamemeta-wasm-%s" % version, wasm, mtime)
+    with open(os.path.join(out, "game-metadata-%s.pom" % version), "w", encoding="utf-8") as f:
+        f.write(make_pom(version, owner, repo))
+
+    names = sorted(n for n in os.listdir(out) if n != "SHA256SUMS" and os.path.isfile(os.path.join(out, n)))
+    with open(os.path.join(out, "SHA256SUMS"), "w", encoding="utf-8") as f:  # one list over everything, replacing release's
+        for n in names:
+            f.write("%s  %s\n" % (sha256(os.path.join(out, n)), n))
+    return out, names + ["SHA256SUMS"]
+
+
+# ---------------------------------------------------------------- publish
+def main(argv):
+    load_local()
+    args = [a for a in argv if not a.startswith("-")]
+    flags = {a for a in argv if a.startswith("-")}
+    if len(args) != 1 or flags - {"--go"}:
+        print("usage: scripts/publish <version> [--go]", file=sys.stderr)
+        return 2
+    version, go = args[0], "--go" in flags
+    tag = "v" + version
+    os.chdir(ROOT)
+
+    print("== gates")
+    results = gates(version)
+    for name, ok, detail in results:
+        lines = detail.split("\n")
+        print("  %-5s %-16s %s" % ("PASS" if ok else "FAIL", name, "\n".join(lines[:4]) + ("\n    ... %d more lines" % (len(lines) - 4) if len(lines) > 4 else "")))
+    failed = [r for r in results if not r[1]]
+    if go and failed:
+        print("publish: refused, nothing was built, tagged, pushed or uploaded. Failing: %s" % ", ".join(
+            "%s (%s)" % (n, d.split("\n")[0]) for n, _, d in failed), file=sys.stderr)
+        return 1
+    if not go:
+        print("dry run: %s" % ("every gate passes" if not failed else "--go would be refused (%s)" % ", ".join(n for n, _, _ in failed)))
+
+    out, assets = build(version)
+    print("== assets (%s)" % os.path.relpath(out, ROOT))
+    for n in assets:
+        print("asset %-40s %10d bytes" % (n, os.path.getsize(os.path.join(out, n))))
+
+    main_sha = run("git", "rev-parse", "origin/main").stdout.strip()
+    notes = changelog_notes(version)
+    print("== tag %s on %s (annotated, tagger date %s)" % (tag, main_sha[:10], now_utc().strftime("%Y-%m-%d %H:%M:%S +0000")))
+    release = run("gh", "release", "view", tag, "--json", "assets", "-q", ".assets[].name", check=False)
+    exists = release.returncode == 0
+    if not exists and "not found" not in release.stderr and go:
+        raise Refuse("gh release view failed: %s" % release.stderr.strip())
+    have = set(release.stdout.split()) if exists else set()
+    missing = [n for n in assets if n not in have]
+    if exists:
+        print("== release %s exists with %d of %d assets; would upload: %s" % (tag, len(have & set(assets)), len(assets),
+                                                                          ", ".join(missing) or "nothing, it is complete"))
+    else:
+        print("== release %s: would create it with %d assets and the CHANGELOG.md notes" % (tag, len(assets)))
+    if not go:
+        print("dry run: nothing was tagged, pushed or uploaded. Add --go to publish.")
+        return 0
+
+    # Tag. Tagger date = now, UTC; pushed only while the time check still passes; never forced.
+    if remote_tag(tag):
+        print("tag %s already on origin" % tag)
+    else:
+        local = run("git", "rev-parse", "-q", "--verify", "refs/tags/%s^{commit}" % tag, check=False).stdout.strip()
+        if local and local != main_sha:
+            raise Refuse("local tag %s is on another commit (%s)" % (tag, local[:10]))
+        if not local:
+            stamp = "%d +0000" % int(now_utc().timestamp())
+            run("git", "tag", "-a", tag, "-m", "game-metadata %s" % version, main_sha,
+                env=dict(os.environ, GIT_COMMITTER_DATE=stamp))
+        ok, msg = time_check()
+        if not ok:
+            raise Refuse("the time check refuses, tag %s stays local: %s" % (tag, msg))
+        run("git", "push", "origin", "refs/tags/%s" % tag)
+        print("pushed tag %s" % tag)
+
+    ok, msg = time_check()
+    if not ok:
+        raise Refuse("the time check refuses, the release is not touched: %s" % msg)
+    if not exists:
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+            f.write(notes + "\n")
+        try:
+            run("gh", "release", "create", tag, *[os.path.join(out, n) for n in assets], "--verify-tag",
+                "--title", "game-metadata %s" % version, "--notes-file", f.name)
+        finally:
+            os.unlink(f.name)
+        print("created release %s" % tag)
+    elif missing:
+        run("gh", "release", "upload", tag, *[os.path.join(out, n) for n in missing])
+        print("uploaded %d missing asset(s) to %s" % (len(missing), tag))
+    else:
+        print("release %s already has every asset; nothing to upload" % tag)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except Refuse as e:
+        print("publish: %s" % e, file=sys.stderr)
+        sys.exit(1)

@@ -1,0 +1,4 @@
+file: tux.gg
+info: {"platform":"GameGear","title":null,"titles":{},"titleId":null,"productCode":"99901","gameId":null,"makerCode":null,"headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica","Europe"],"regionFree":false,"ratings":{},"banner":null,"version":0,"cart":{"family":"sms","offset":16368,"checksum":14202,"product":99901,"version":0,"region_code":6,"size_code":11,"rom_size":16384,"game_gear":true}}
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":"ed7124e92ed2425654bdef87971d941b","primaryId":null}
+checksum: true

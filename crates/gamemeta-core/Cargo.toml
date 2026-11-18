@@ -1,0 +1,34 @@
+[package]
+name = "gamemeta-core"
+description = "Pure-Rust readers for game file metadata: titles, icons, ids. No I/O: the caller supplies bytes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+# Adds `std::error::Error` impls; the readers themselves only need `alloc`.
+std = []
+
+[dependencies]
+# Inflate (zip entries, GCZ blocks): pure Rust, no_std + alloc. MIT OR Zlib OR Apache-2.0.
+miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
+
+# Zstd decoding (RVZ groups, ZArchive blocks): pure Rust, no_std + alloc, no checksum feature. MIT.
+ruzstd = { version = "0.9", default-features = false }
+# Shift_JIS decoding of Japanese disc banners (windows-1252 is a 32-entry table in the reader). (Apache-2.0 OR MIT) AND BSD-3-Clause.
+encoding_rs = { version = "0.8", default-features = false, features = ["alloc"] }
+
+# RetroAchievements hashes (MD5), streaming: pure Rust, no_std. MIT OR Apache-2.0.
+md5 = { version = "0.8", default-features = false }
+
+# sin, cos, floor and ceil for the banner renderer (core has no std): double precision results, as the JVM's. MIT OR Apache-2.0.
+libm.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+gamemeta-fixtures.workspace = true

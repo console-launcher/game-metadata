@@ -1,0 +1,25 @@
+[package]
+name = "gamemeta-cli"
+description = "Dump what game-metadata reads from game files, as JSON."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "gamemeta"
+path = "src/main.rs"
+
+[dependencies]
+gamemeta-core = { workspace = true, features = ["std"] }
+gamemeta-json.workspace = true
+banner3ds-scene = { workspace = true, features = ["std"] }
+banner3ds-soft = { workspace = true, features = ["std"] }
+banner3ds-export.workspace = true
+
+[dev-dependencies]
+gamemeta-fixtures.workspace = true
+
+[lints]
+workspace = true

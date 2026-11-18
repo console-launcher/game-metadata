@@ -1,0 +1,88 @@
+[package]
+name = "gamemeta-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+gamemeta-core = { path = "../crates/gamemeta-core" }
+banner3ds-scene = { path = "../crates/banner3ds-scene" }
+banner3ds-soft = { path = "../crates/banner3ds-soft" }
+
+# Its own workspace: nightly-only, kept out of the main gate.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "threeds_walk"
+path = "fuzz_targets/threeds_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "nds_walk"
+path = "fuzz_targets/nds_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gc_walk"
+path = "fuzz_targets/gc_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wii_walk"
+path = "fuzz_targets/wii_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wiiu_walk"
+path = "fuzz_targets/wiiu_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "banner3ds_scene"
+path = "fuzz_targets/banner3ds_scene.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ids_walk"
+path = "fuzz_targets/ids_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "banner3ds_render"
+path = "fuzz_targets/banner3ds_render.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "carts"
+path = "fuzz_targets/carts.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wii_banner"
+path = "fuzz_targets/wii_banner.rs"
+test = false
+doc = false
+bench = false

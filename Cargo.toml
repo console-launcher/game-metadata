@@ -1,0 +1,42 @@
+[workspace]
+resolver = "3"
+members = ["crates/gamemeta-core", "crates/gamemeta-fixtures", "crates/gamemeta-ffi", "crates/gamemeta-jni", "crates/gamemeta-cli", "crates/gamemeta-json", "crates/gamemeta-wasm", "crates/banner3ds-scene", "crates/banner3ds-soft", "crates/banner3ds-gles", "crates/banner3ds-export"]
+
+[workspace.package]
+version = "0.7.1"
+edition = "2024"
+rust-version = "1.87"
+license = "MPL-2.0"
+publish = false
+
+[workspace.dependencies]
+gamemeta-core = { path = "crates/gamemeta-core", version = "0.7.1" }
+gamemeta-ffi = { path = "crates/gamemeta-ffi", version = "0.7.1" }
+gamemeta-json = { path = "crates/gamemeta-json", version = "0.7.1" }
+gamemeta-fixtures = { path = "crates/gamemeta-fixtures" }
+banner3ds-scene = { path = "crates/banner3ds-scene", version = "0.7.1" }
+banner3ds-soft = { path = "crates/banner3ds-soft", version = "0.7.1" }
+banner3ds-gles = { path = "crates/banner3ds-gles", version = "0.7.1" }
+banner3ds-export = { path = "crates/banner3ds-export", version = "0.7.1" }
+libm = "0.2.16"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Tests render whole animations: the CPU renderer and the encoders' dependencies are too slow unoptimised.
+[profile.dev.package.banner3ds-soft]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "unwind"
+strip = true

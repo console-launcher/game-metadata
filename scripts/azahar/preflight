@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Checks what a HOME Menu capture needs, from your own install: prints each item as ok or MISSING (paths only, never file
+# contents) and exits 1 when anything is missing. Sourced by `capture`; runs on its own too.
+#   AZAHAR_BIN       the emulator executable (an extracted AppImage's usr/bin/azahar)
+#   AZAHAR_USER      a portable user dir with the HOME Menu and system titles installed (your own console's files)
+#   AZAHAR_SLOT      the visible HOME app whose banner slot is borrowed (default 0004001000021400)
+#   AZAHAR_SLOT_CIA  optional: that app's decrypted CIA; without it the copy installed in AZAHAR_USER is rewritten in the
+#                    scratch instance
+#   AZAHAR_WORK      scratch instance and dumps (default ~/.cache/gamemeta-azahar); must be outside this repository
+missing=0
+ok() { echo "ok       $1" >&2; }
+no() { echo "MISSING  $1" >&2; missing=1; }
+REPO=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." && pwd)
+AZAHAR_SLOT=${AZAHAR_SLOT:-0004001000021400}
+AZAHAR_WORK=${AZAHAR_WORK:-$HOME/.cache/gamemeta-azahar}
+[ -n "${AZAHAR_BIN:-}" ] && [ -x "$AZAHAR_BIN" ] && ok "emulator: $AZAHAR_BIN" || no "AZAHAR_BIN: the emulator executable"
+if [ -n "${AZAHAR_USER:-}" ] && [ -d "$AZAHAR_USER/nand" ]; then
+  ok "user dir: $AZAHAR_USER"
+  ls -d "$AZAHAR_USER"/nand/*/title/00040030/00008f02 >/dev/null 2>&1 || ls -d "$AZAHAR_USER"/nand/*/title/00040030/00009802 \
+    >/dev/null 2>&1 || ls -d "$AZAHAR_USER"/nand/*/title/00040030/00008202 >/dev/null 2>&1 \
+    && ok "HOME Menu installed" || no "HOME Menu in AZAHAR_USER (install your console's system titles)"
+  if [ -n "${AZAHAR_SLOT_CIA:-}" ]; then
+    [ -f "$AZAHAR_SLOT_CIA" ] && ok "slot CIA: $AZAHAR_SLOT_CIA" || no "AZAHAR_SLOT_CIA: $AZAHAR_SLOT_CIA"
+  else
+    ls "$AZAHAR_USER"/nand/*/title/00040010/"${AZAHAR_SLOT: -8}"/content/*.app >/dev/null 2>&1 \
+      && ok "slot app $AZAHAR_SLOT installed" || no "slot app $AZAHAR_SLOT in AZAHAR_USER (or set AZAHAR_SLOT_CIA)"
+  fi
+else
+  no "AZAHAR_USER: a user dir with nand/ (HOME Menu and system titles installed)"
+fi
+case "$(readlink -m "$AZAHAR_WORK")/" in "$REPO"/*) no "AZAHAR_WORK outside the repository (now $AZAHAR_WORK)" ;; *) ok "work dir: $AZAHAR_WORK" ;; esac
+for t in Xvfb xdotool ffmpeg ffprobe python3; do command -v "$t" >/dev/null && ok "$t" || no "$t"; done
+python3 -I -c 'import numpy, PIL' 2>/dev/null && ok "python3: numpy, PIL" || no "python3 numpy and PIL"
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then exit "$missing"; fi
+[ "$missing" = 0 ]

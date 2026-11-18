@@ -1,0 +1,21 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Sourced by scripts/release: points cargo at the NDK's clang for the Android targets.
+#   ANDROID_NDK_HOME   the NDK (default: the newest under ~/Android/Sdk/ndk)
+#   ANDROID_API        the minimum API level to link against (default 27)
+ndk="${ANDROID_NDK_HOME:-$(ls -d "$HOME"/Android/Sdk/ndk/* 2>/dev/null | sort -V | tail -1)}"
+[[ -d "$ndk" ]] || { echo "no NDK: set ANDROID_NDK_HOME" >&2; return 1; }
+api="${ANDROID_API:-27}"
+host_tag="$(uname -s | tr '[:upper:]' '[:lower:]')-x86_64"
+bin="$ndk/toolchains/llvm/prebuilt/$host_tag/bin"
+export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$bin/aarch64-linux-android$api-clang"
+export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$bin/armv7a-linux-androideabi$api-clang"
+export CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER="$bin/x86_64-linux-android$api-clang"
+export CARGO_TARGET_I686_LINUX_ANDROID_LINKER="$bin/i686-linux-android$api-clang"
+# 16 KB pages (Android 15+ devices) need 16 KB-aligned ELF segments.
+for t in AARCH64_LINUX_ANDROID ARMV7_LINUX_ANDROIDEABI X86_64_LINUX_ANDROID I686_LINUX_ANDROID; do
+  export "CARGO_TARGET_${t}_RUSTFLAGS=-C link-arg=-Wl,-z,max-page-size=16384"
+done
+export ANDROID_LLVM_STRIP="$bin/llvm-strip"

@@ -1,0 +1,28 @@
+[package]
+name = "gamemeta-ffi"
+description = "C ABI for gamemeta-core: opaque handles, caller-supplied reads, explicit frees."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "gamemeta"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+gamemeta-core = { workspace = true, features = ["std"] }
+banner3ds-scene = { workspace = true, features = ["std"] }
+banner3ds-soft = { workspace = true, features = ["std"] }
+banner3ds-gles.workspace = true
+
+[dev-dependencies]
+gamemeta-fixtures = { workspace = true, features = ["gl"] }
+
+[[test]]
+name = "gles_abi"
+harness = false
+
+[lints]
+workspace = true

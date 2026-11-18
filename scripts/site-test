@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Builds the site and tests it: node unit tests for the page's logic, then a headless Chromium on site/dist (the demo draws in
+# WebGL 2 and on the CPU, picked fixtures show the right titles and ids, a folder is a Wii U title, big files are read in place,
+# no network request after load). Needs node 20+ and a Chromium (see site/test/browser.test.mjs). Heavy; run one at a time:
+#   scripts/site-test
+set -euo pipefail
+cd "$(dirname "$0")/.."
+scripts/site-build
+cd site
+[[ -d node_modules/playwright-core ]] || npm ci --no-audit --no-fund --loglevel=error
+node --test "test/*.test.mjs"

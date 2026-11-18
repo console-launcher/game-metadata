@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Publishes site/dist to the `gh-pages` branch of `origin` (GitHub Pages: branch gh-pages, folder /). The branch is generated:
+# each deploy is one fresh commit that replaces it. Builds nothing itself: run scripts/site-build (or scripts/site-test) first.
+#   scripts/site-deploy           dry run: make the commit in a scratch repo and say what would be pushed
+#   scripts/site-deploy --push    push it (refuses a private repository, where Pages cannot serve it)
+# Pages must be switched on once in the repository's settings (Pages > Deploy from a branch > gh-pages).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+dist="$PWD/site/dist"
+[[ -f "$dist/index.html" && -f "$dist/pkg/gamemeta_wasm_bg.wasm" ]] || { echo "site/dist is not built: scripts/site-build" >&2; exit 1; }
+origin=$(git remote get-url origin)
+src=$(git rev-parse --short HEAD)
+
+scratch=$(mktemp -d)
+cleanup() { find "$scratch" -type f -delete; find "$scratch" -depth -type d -empty -delete; }
+trap cleanup EXIT
+cp -R "$dist/." "$scratch/"
+git -C "$scratch" init -q -b gh-pages
+git -C "$scratch" add -A
+git -C "$scratch" -c user.name="$(git config user.name)" -c user.email="$(git config user.email)" \
+  commit -q -m "site: build of $src"
+echo "site-deploy: $(git -C "$scratch" ls-files | wc -l) files, one commit, for $origin (gh-pages)" >&2
+
+if [[ "${1:-}" != "--push" ]]; then
+  echo "site-deploy: dry run, nothing pushed (--push to publish)" >&2
+  exit 0
+fi
+if command -v gh >/dev/null; then
+  visibility=$(gh repo view "$origin" --json visibility --jq .visibility 2>/dev/null || echo unknown)
+  [[ "$visibility" == "PUBLIC" ]] || { echo "site-deploy: the repository is $visibility; Pages serves only a public repository here" >&2; exit 1; }
+fi
+git -C "$scratch" push --force "$origin" gh-pages:gh-pages
+echo "site-deploy: pushed gh-pages ($src)" >&2

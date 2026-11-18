@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# fetch-refs [--env]: sync an optional private reference set (see scripts/dolphin/ref_library.py for how to point at it) into ~/.cache/gamemeta-wii-refs (or $GM_WII_REFS_CACHE), only the
+# files whose manifest hash changed. With --env, stdout is `export GM_WII_REFS=...` for the reference test (eval it). Without access
+# (a contributor): one "skipped: no access" line on stderr, exit 0, and the test skips. See docs/wii-references.md.
+exec python3 -I "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/ref_library.py" fetch "$@"

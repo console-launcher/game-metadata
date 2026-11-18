@@ -1,0 +1,4 @@
+file: tux.sms
+info: {"platform":"MasterSystem","title":null,"titles":{},"titleId":null,"productCode":"99901","gameId":null,"makerCode":null,"headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica","Europe"],"regionFree":false,"ratings":{},"banner":null,"version":0,"cart":{"family":"sms","offset":16368,"checksum":14202,"product":99901,"version":0,"region_code":4,"size_code":11,"rom_size":16384,"game_gear":false}}
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":"0aeaef17b762465eb99873fc1780b33c","primaryId":null}
+checksum: true

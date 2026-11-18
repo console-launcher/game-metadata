@@ -1,0 +1,13 @@
+target/
+*.swp
+.DS_Store
+/dist/
+/fuzz/target/
+/fuzz/corpus/
+/fuzz/artifacts/
+/fuzz/coverage/
+/site/dist/
+/site/node_modules/
+__pycache__/
+.publish.local
+*.pyc

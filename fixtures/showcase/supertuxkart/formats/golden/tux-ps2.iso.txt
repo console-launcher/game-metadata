@@ -1,0 +1,3 @@
+file: tux-ps2.iso
+info: null
+ids: {"serial":"SLUS99902","gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":null,"primaryId":"SLUS99902"}

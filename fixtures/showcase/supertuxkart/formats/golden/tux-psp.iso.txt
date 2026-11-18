@@ -1,0 +1,3 @@
+file: tux-psp.iso
+info: null
+ids: {"serial":"ULUS99901","gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":"SuperTuxKart","pspDiscId":"ULUS99901","xboxId":null,"raMd5":null,"primaryId":"ULUS99901"}

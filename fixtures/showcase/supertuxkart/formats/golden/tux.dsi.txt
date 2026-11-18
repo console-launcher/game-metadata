@@ -1,0 +1,12 @@
+file: tux.dsi
+info: {"platform":"Dsi","title":"SuperTuxKart Kart racing","titles":{"Japanese":{"name":"SuperTuxKart カートレース","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"English":{"name":"SuperTuxKart Kart racing","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"French":{"name":"SuperTuxKart Course de karts","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"German":{"name":"SuperTuxKart Kart-Rennen","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"Italian":{"name":"SuperTuxKart Corsa di kart","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"Spanish":{"name":"SuperTuxKart Carreras de karts","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"ChineseSimplified":{"name":"SuperTuxKart 卡丁车竞速","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"},"Korean":{"name":"SuperTuxKart 카트 레이싱","shortName":"SuperTuxKart","publisher":"SuperTuxKart Team"}},"titleId":null,"productCode":null,"gameId":"TUXE","makerCode":"00","headerTitle":null,"icon":{"width":32,"height":32},"smallIcon":null,"animation":[6,6,6,6,6,6,6,6],"images":[],"bootMovie":null,"bootSound":null,"regions":[],"regionFree":false,"ratings":{},"banner":{"offset":512,"size":9152},"version":null,"cart":null}
+ids: null
+icon: 32x32 sha256=b06658408d6e7dce3a240e1e74d6b618d46097141253cc9ad91ea6cda15ec7b9
+frame 0 (6 ticks): 32x32 sha256=b06658408d6e7dce3a240e1e74d6b618d46097141253cc9ad91ea6cda15ec7b9
+frame 1 (6 ticks): 32x32 sha256=ee434958da6efb2adbeb08cb7a8d668017abeb83b8da9b1e58d46ccf42570024
+frame 2 (6 ticks): 32x32 sha256=b12c3da699c79440509957a5e7a1c76b09ac68c6785d4f48e2d8ca69fc6a259a
+frame 3 (6 ticks): 32x32 sha256=84c51d0a9e4db08a1614641a4c071ff67fd0b7c0f7202cb924b4edad10c24688
+frame 4 (6 ticks): 32x32 sha256=429f77713a39162417b3d122bca700a6c0d918435d867d4a4ec9f2df21060ac2
+frame 5 (6 ticks): 32x32 sha256=da30cdc4cd8f2bcf76a1ad7047fe09aca5056f132582a790b3a62bf21ba4f116
+frame 6 (6 ticks): 32x32 sha256=96827b45cbd59d4b4b987e906a1b4ac0cbab5b08cdc71c7e05ddc39886ccc63e
+frame 7 (6 ticks): 32x32 sha256=505084e48d8887fe805e0363970942efec70ead2a939110f92fed77eb1af9f70

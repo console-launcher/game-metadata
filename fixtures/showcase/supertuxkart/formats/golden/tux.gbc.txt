@@ -1,0 +1,4 @@
+file: tux.gbc
+info: {"platform":"GameBoyColor","title":"SUPERTUXKART","titles":{"English":{"name":"SUPERTUXKART","shortName":"SUPERTUXKART","publisher":null}},"titleId":null,"productCode":null,"gameId":null,"makerCode":"00","headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica","Europe"],"regionFree":false,"ratings":{},"banner":null,"version":0,"cart":{"family":"gb","title":"SUPERTUXKART","manufacturer_code":null,"cgb":2,"sgb":false,"licensee":"00","old_licensee":0,"new_licensee":null,"cart_type":0,"rom_size":32768,"ram_size":0,"destination":1,"version":0,"header_checksum":100,"header_checksum_valid":true,"global_checksum":29608,"logo_valid":true}}
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":"f9c4b23310d94f14d4f076eb893cd137","primaryId":null}
+checksum: true

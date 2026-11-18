@@ -1,0 +1,3 @@
+file: tux-wii.iso
+info: {"platform":"Wii","title":null,"titles":{},"titleId":null,"productCode":null,"gameId":"RTXE00","makerCode":"00","headerTitle":"SuperTuxKart","icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica"],"regionFree":false,"ratings":{},"banner":null,"version":null,"cart":null}
+ids: {"serial":null,"gameId":"RTXE00","titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":null,"primaryId":"RTXE00"}

@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Captures the real HOME Menu drawing a banner, headless, and writes reference keyframes beside it.
+#   scripts/azahar/capture [--clips "300 360 420"] [--seconds 4] [--out <dir>] <banner.cbmd|.3ds|.cia>...
+# For each file: <dir>/<stem>.azahar/ (or --out, one file only) gets c<clip>.png keyframes, clip.mp4 when --seconds > 0, and
+# manifest.json (emulator version, frame times, mask). See README.md here for the setup (bring your own system files).
+set -euo pipefail
+HERE=$(dirname "$(readlink -f "$0")")
+CLIPS="300 360 420"; SECONDS_CLIP=0; OUT=""
+while [ $# -gt 0 ]; do
+  case $1 in
+    --clips) CLIPS=$2; shift 2 ;;
+    --seconds) SECONDS_CLIP=$2; shift 2 ;;
+    --out) OUT=$2; shift 2 ;;
+    -h|--help) sed -n '6,9p' "$0" | cut -c3-; exit 0 ;;
+    *) break ;;
+  esac
+done
+[ $# -ge 1 ] || { sed -n '6,9p' "$0" | cut -c3- >&2; exit 2; }
+[ -z "$OUT" ] || [ $# -eq 1 ] || { echo "--out takes one banner" >&2; exit 2; }
+# shellcheck source=preflight
+. "$HERE/preflight" || { echo "preflight failed: set the MISSING items above (README.md)" >&2; exit 1; }
+for f in "$@"; do [ -f "$f" ] || { echo "$f: no such file" >&2; exit 2; }; done
+
+DN=${AZAHAR_DISPLAY:-88}
+INST=$AZAHAR_WORK/instance
+export DISPLAY=:$DN
+# Window geometry at 1280x960, internal scale 1 (screen coordinates): measured once, see README.md.
+CX=440; CY=230; MENU="234 224|294 335|470 357"; CONT="765 467"; TOOLS="438 224|480 337"
+DLG_PATH="640 333"; DLG_OPT="640 429"; DLG_OK="825 629"; TUT="640 536"; RDY="724 635"
+xy() { echo "$1" | cut -d'|' -f"$2"; }
+sc() { echo $((CX + $1)) $((CY + $2)); }
+tap() { xdotool mousemove "$1" "$2"; sleep 0.4; xdotool mousedown 1; sleep 0.5; xdotool mouseup 1; }
+key() { xdotool keydown "$1"; sleep 0.15; xdotool keyup "$1"; }   # a held key (>0.3 s) repeats and moves the HOME cursor twice
+log() { echo "[$(date +%H:%M:%S)] $*" >&2; }
+env_az() { env LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=xcb SDL_AUDIODRIVER=dummy XDG_DATA_HOME="$INST/xdg/data" \
+  XDG_CONFIG_HOME="$INST/xdg/config" XDG_CACHE_HOME="$INST/xdg/cache" "$@"; }
+
+setup() {
+  # A private working copy of your user dir, so the capture never changes your install. It stays under AZAHAR_WORK (outside the
+  # repository, mode 0700) and is reused by later runs; `rm -r "$AZAHAR_WORK"` removes it.
+  mkdir -p "$AZAHAR_WORK" && chmod 700 "$AZAHAR_WORK"
+  mkdir -p "$INST/xdg"
+  [ -d "$INST/user" ] || cp -a "$AZAHAR_USER" "$INST/user"
+  python3 -I - "$INST/user/config/qt-config.ini" <<'PY'
+import re, sys
+p = sys.argv[1]; s = open(p).read()
+for k, v in (('layout_option', '0'), ('resolution_factor', '1'), ('output_type', '1'), ('volume', '0'), ('log_filter', '*:Info')):
+    s = re.sub(r'^' + k + r'=.*$', k + '=' + v, s, count=1, flags=re.M)
+    s = re.sub(r'^' + k + r'\\default=.*$', k + r'\\default=false', s, count=1, flags=re.M)
+open(p, 'w').write(s)
+PY
+  if ! { [ -f "$INST/xvfb.pid" ] && kill -0 "$(cat "$INST/xvfb.pid")" 2>/dev/null; }; then
+    Xvfb ":$DN" -screen 0 1280x960x24 >"$INST/xvfb.log" 2>&1 &
+    echo $! >"$INST/xvfb.pid"; sleep 1
+  fi
+}
+
+stop_emulator() { if [ -f "$INST/az.pid" ]; then kill -9 "$(cat "$INST/az.pid")" 2>/dev/null || true; rm -f "$INST/az.pid"; sleep 2; fi; }
+stop_all() { stop_emulator; if [ -f "$INST/xvfb.pid" ]; then kill "$(cat "$INST/xvfb.pid")" 2>/dev/null || true; rm -f "$INST/xvfb.pid"; fi; }
+
+shot() { ffmpeg -v error -y -f x11grab -video_size 1280x960 -i ":$DN" -frames:v 1 "$INST/$1.png" 2>/dev/null || true; }   # private
+pix() { ffmpeg -v error -f x11grab -video_size 1x1 -i ":$DN+$1,$2" -frames:v 1 -f rawvideo -pix_fmt rgb24 - 2>/dev/null | od -An -tu1; }
+wait_pix() {  # x y r g b tolerance timeout: until the screen pixel is near r g b (the boot has no fixed duration)
+  local t=$SECONDS pr pg pb
+  while [ $((SECONDS - t)) -lt "$7" ]; do
+    read -r pr pg pb <<<"$(pix "$1" "$2")" || true
+    if [ -n "${pb:-}" ] && [ $((pr > $3 ? pr - $3 : $3 - pr)) -lt "$6" ] && [ $((pg > $4 ? pg - $4 : $4 - pg)) -lt "$6" ] \
+      && [ $((pb > $5 ? pb - $5 : $5 - pb)) -lt "$6" ]; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
+
+boot_home() {
+  stop_emulator
+  (cd "$INST" && env_az setsid bash -c 'echo $$ > az.pid; exec "$0"' "$AZAHAR_BIN" >"$INST/az.log" 2>&1 &)
+  sleep 8
+  tap $(xy "$MENU" 1); sleep 1; tap $(xy "$MENU" 2); sleep 1; tap $(xy "$MENU" 3)   # File > Boot Home Menu > first region
+  sleep 38; tap $CONT                                                                  # a missing sysmodule's error: Continue
+  # the first-run tutorial comes up whenever the boot gets there (later on a loaded machine): close it until the app list shows
+  local t=$SECONDS
+  until wait_pix $RDY 255 170 0 50 5; do
+    if [ $((SECONDS - t)) -gt 300 ]; then shot boot-fail; log "the HOME app list never appeared (screen: $INST/boot-fail.png)"; return 1; fi
+    if wait_pix $TUT 255 150 0 60 1; then
+      sleep 2; tap $(sc 198 440)   # tutorial: Next
+      sleep 6; tap $(sc 56 469)    # tutorial: close
+    else
+      tap $CONT                    # a late error dialog (the top screen, untouchable, when there is none)
+      for _ in 1 2 3 4 5 6; do key f; sleep 0.6; done   # a list HOME left scrolled elsewhere: back to its left end
+    fi
+  done
+  sleep 8; touch "$INST/home.ok"
+}
+home_running() { [ -f "$INST/az.pid" ] && kill -0 "$(cat "$INST/az.pid")" 2>/dev/null && [ -f "$INST/home.ok" ]; }
+slot_app() { ls "$INST"/user/nand/*/title/00040010/"${AZAHAR_SLOT: -8}"/content/*.app 2>/dev/null | head -1; }
+
+wait_frames() {  # dump frames timeout: the dump is frame-exact (60 per emulated second), so wait for frames, not wall time
+  local t=$SECONDS n=0
+  while [ $((SECONDS - t)) -lt "$3" ]; do
+    sleep 8
+    n=$(ffprobe -v error -select_streams v:0 -count_packets -show_entries stream=nb_read_packets -of csv=p=0 "$1" 2>/dev/null | head -1)
+    [ "${n:-0}" -ge "$2" ] 2>/dev/null && return 0
+  done
+  log "the dump has ${n:-0} of $2 frames after $3 s"; return 1
+}
+
+one() {
+  local src=$1 dir stem out tmp need
+  dir=$(cd "$(dirname "$src")" && pwd); stem=$(basename "$src"); stem=${stem%.*}
+  out=${OUT:-$dir/$stem.azahar}; tmp=$INST/tmp; mkdir -p "$tmp"; rm -f "$tmp/dump.mkv"
+  # `one` runs under `||`, where bash ignores set -e: every step that can fail returns on its own
+  python3 -I "$HERE/banner.py" extract "$src" "$tmp/banner.cbmd" >/dev/null || return 1
+  if ! home_running; then   # first banner: install the slot app with this banner and boot HOME once; later ones swap live
+    if [ -n "${AZAHAR_SLOT_CIA:-}" ]; then
+      python3 -I "$HERE/banner.py" swap "$AZAHAR_SLOT_CIA" "$tmp/banner.cbmd" "$tmp/slot.cia" || return 1
+      env_az "$AZAHAR_BIN" -i "$tmp/slot.cia" >/dev/null 2>&1; rm -f "$tmp/slot.cia"
+    else
+      python3 -I "$HERE/banner.py" swap-app "$(slot_app)" "$tmp/banner.cbmd" || return 1
+    fi
+    boot_home || return 1
+  else
+    python3 -I "$HERE/banner.py" swap-app "$(slot_app)" "$tmp/banner.cbmd" || return 1
+  fi
+  for _ in 1 2 3 4 5 6; do key f; sleep 1.2; done   # the left end of the app list
+  key h; sleep 5                                      # the game card slot: a neutral wall before the banner
+  tap $(xy "$TOOLS" 1); sleep 1; tap $(xy "$TOOLS" 2); sleep 2   # Tools > Dump Video, lossless
+  tap $DLG_PATH; xdotool key ctrl+a; xdotool type --delay 20 "$tmp/dump.mkv"
+  tap $DLG_OPT; xdotool key ctrl+a; xdotool type --delay 20 "crf:0,preset:ultrafast"
+  tap $DLG_OK; sleep 3
+  key h                                               # the cursor lands on the borrowed slot: HOME loads the banner
+  need=$((${CLIPS##* } + ${SECONDS_CLIP%.*} * 60 + 900))
+  wait_frames "$tmp/dump.mkv" "$need" $((need / 6 + 120)) || return 1
+  tap $(xy "$TOOLS" 1); sleep 1; tap $(xy "$TOOLS" 2); sleep 3   # stop the dump
+  python3 -I "$HERE/frames.py" "$tmp/dump.mkv" "$out" "$tmp/banner.cbmd" "$AZ_VER" "$CLIPS" "$SECONDS_CLIP" \
+    || { log "kept the dump for a look: $tmp/dump.mkv"; return 1; }
+  mv "$tmp/dump.mkv" "$tmp/last-dump.mkv"; rm -f "$tmp/banner.cbmd"   # the last dump stays for a look (private, overwritten)
+}
+
+version() {  # some builds have no --version; their version string is in the binary
+  local v; v=$("$AZAHAR_BIN" --version 2>/dev/null | grep -m1 -xE '[0-9]{4}\.[0-9.]+' || true)
+  [ -n "$v" ] || v=$(strings "$AZAHAR_BIN" | grep -m1 -xE '[0-9]{4}\.[0-9]+(\.[0-9]+)?' || true)
+  echo "${v:-unknown}"
+}
+AZ_VER=$(version)
+trap stop_all EXIT
+setup
+rm -f "$INST/home.ok"
+fail=0
+for f in "$@"; do one "$f" || { log "$f: FAILED"; fail=1; }; done
+exit $fail

@@ -1,0 +1,6 @@
+# JitPack does not build this repository (it has a Rust core and needs an NDK). It installs the AAR that scripts/publish attached
+# to the GitHub release of the tag. See docs/releasing.md.
+jdk:
+  - openjdk17
+install:
+  - scripts/jitpack-install

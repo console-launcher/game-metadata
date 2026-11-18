@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Local gate (no CI): format, lints, tests, the no_std and portability builds, and (when present) the Kotlin binding test.
+#   scripts/check            everything
+#   scripts/check --rust     Rust only (no Kotlin, no website)
+set -euo pipefail
+cd "$(dirname "$0")/.."
+run() { echo "== $*" >&2; "$@"; }
+
+run python3 -I scripts/license-headers --check
+run python3 -I scripts/test_publish.py
+run python3 -I scripts/test_third_party_notices.py
+run scripts/third-party-notices --check
+run python3 -I scripts/dolphin/test_ref_library.py
+run cargo fmt --all --check
+run cargo clippy --workspace --all-targets -- -D warnings
+run cargo test --workspace --quiet
+# The core, the scene crate and both renderers must stay no_std + alloc: build them for a bare-metal target.
+if rustup target list --installed | grep -qx thumbv7em-none-eabihf; then
+  run cargo build -p gamemeta-core -p banner3ds-scene -p banner3ds-soft -p banner3ds-gles --target thumbv7em-none-eabihf --quiet
+else
+  echo "skip: no_std build (rustup target add thumbv7em-none-eabihf)" >&2
+fi
+# Portability: the libraries (core, scene, both renderers, the C ABI) build for the web (wasm32) and compile for Apple (iOS,
+# macOS), Android (with the JNI binding) and Windows. A missing target is skipped with a note, never silently.
+installed=$(rustup target list --installed)
+if grep -qx wasm32-unknown-unknown <<<"$installed"; then
+  run cargo build -p gamemeta-core -p banner3ds-scene -p banner3ds-soft -p banner3ds-gles -p gamemeta-ffi \
+    --target wasm32-unknown-unknown --quiet
+else
+  echo "skip: wasm32 build (rustup target add wasm32-unknown-unknown)" >&2
+fi
+libs=(-p gamemeta-core -p banner3ds-scene -p banner3ds-soft -p banner3ds-gles -p gamemeta-ffi)
+for target in aarch64-apple-ios aarch64-apple-darwin x86_64-pc-windows-msvc aarch64-linux-android armv7-linux-androideabi; do
+  if grep -qx "$target" <<<"$installed"; then
+    extra=(); [[ "$target" == *android* ]] && extra=(-p gamemeta-jni)
+    run cargo check "${libs[@]}" "${extra[@]}" --target "$target" --quiet
+  else
+    echo "skip: $target check (rustup target add $target)" >&2
+  fi
+done
+# The committed C header matches the code, and a C program compiles and runs against it.
+if command -v cbindgen >/dev/null; then
+  tmp=$(mktemp)
+  cbindgen --quiet --config crates/gamemeta-ffi/cbindgen.toml --crate gamemeta-ffi --output "$tmp" crates/gamemeta-ffi
+  if ! diff -q "$tmp" crates/gamemeta-ffi/include/gamemeta.h >/dev/null; then
+    echo "include/gamemeta.h is stale: scripts/gen-header" >&2; rm -f "$tmp"; exit 1
+  fi
+  rm -f "$tmp"
+else
+  echo "skip: header drift check (cargo install --locked cbindgen)" >&2
+fi
+run cargo build -p gamemeta-ffi --quiet
+run cc -std=c99 -Wall -Wextra -Werror -o target/debug/dump-c examples/c/dump.c -Icrates/gamemeta-ffi/include -Ltarget/debug -lgamemeta
+LD_LIBRARY_PATH=target/debug target/debug/dump-c fixtures/sample.3ds | grep -qx 'title=Sample Game Subtitle'
+# The README's snippets are compiled code (the gamemeta-core `readme` example, the C one here, the Kotlin test) and the README shows
+# exactly those lines.
+run cc -std=c99 -Wall -Wextra -Werror -o target/debug/readme-c examples/c/readme.c -Icrates/gamemeta-ffi/include -Ltarget/debug -lgamemeta
+LD_LIBRARY_PATH=target/debug target/debug/readme-c fixtures/sample.3ds | grep -qx 'Sample Game Subtitle'
+run python3 -I scripts/readme-snippets
+if [[ "${1:-}" != "--rust" && -x bindings/kotlin/gradlew ]]; then
+  run scripts/kotlin-test
+fi
+# The JitPack path: jitpack.yml's install step against a stand-in release, then a Gradle project resolving the coordinates.
+if [[ "${1:-}" != "--rust" && -x bindings/kotlin/gradlew ]]; then
+  run python3 -I scripts/test_jitpack.py
+fi
+# The website: built, unit-tested and driven in a headless browser (needs node and a Chromium; skipped with --rust).
+if [[ "${1:-}" != "--rust" ]]; then
+  run scripts/site-test
+fi
+echo "check: green" >&2

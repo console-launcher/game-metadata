@@ -1,0 +1,28 @@
+[package]
+name = "gamemeta-jni"
+description = "JNI binding of game-metadata for Android and desktop JVMs (Kotlin API in bindings/kotlin)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "gamemeta_jni"
+crate-type = ["cdylib"]
+
+[dependencies]
+gamemeta-core = { workspace = true, features = ["std"] }
+gamemeta-ffi.workspace = true
+banner3ds-soft = { workspace = true, features = ["std"] }
+jni = { version = "0.21.1", default-features = false }
+
+# dlopen/dlsym: the GL renderer takes its functions from the GLES library the Kotlin side names.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+gamemeta-fixtures.workspace = true

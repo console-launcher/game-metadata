@@ -1,0 +1,3 @@
+file: tux.xbe
+info: null
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":"FFFE0001","raMd5":null,"primaryId":null}

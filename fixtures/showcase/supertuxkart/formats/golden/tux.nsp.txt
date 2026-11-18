@@ -1,0 +1,3 @@
+file: tux.nsp
+info: null
+ids: {"serial":null,"gameId":null,"titleId":"0100F3FF0000A000","chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":null,"primaryId":"0100F3FF0000A000"}

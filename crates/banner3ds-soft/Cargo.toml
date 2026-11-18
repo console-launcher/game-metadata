@@ -1,0 +1,23 @@
+[package]
+name = "banner3ds-soft"
+description = "A CPU renderer for 3DS HOME banners (a banner3ds-scene scene into an RGBA buffer): the pixel reference for banner3ds-gles."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+std = ["gamemeta-core/std", "banner3ds-scene/std"]
+
+[dependencies]
+gamemeta-core.workspace = true
+banner3ds-scene.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+gamemeta-core = { workspace = true, features = ["std"] }
+gamemeta-fixtures.workspace = true

@@ -1,0 +1,47 @@
+{
+ "banner_sha256": "59d2e8bd76e62e30c1c218ee2dfd1fb29545b23afe973ad3e165200b17a7af55",
+ "banner_start_frame": 116,
+ "captured": "2026-11-17",
+ "clip_note": "c<clip>.png = the top screen <clip> refreshes after the banner appeared (vsync: n - (3n + 533) / 1066)",
+ "dump_fps": 60,
+ "emulator_version": "2126.2",
+ "frames": [
+  {
+   "clip": 240,
+   "dump_frame": 357,
+   "file": "c0240.png"
+  },
+  {
+   "clip": 300,
+   "dump_frame": 417,
+   "file": "c0300.png"
+  },
+  {
+   "clip": 360,
+   "dump_frame": 477,
+   "file": "c0360.png"
+  },
+  {
+   "clip": 405,
+   "dump_frame": 522,
+   "file": "c0405.png"
+  },
+  {
+   "clip": 430,
+   "dump_frame": 548,
+   "file": "c0430.png"
+  }
+ ],
+ "internal_scale": 1,
+ "mask": "pure magenta outside HOME's banner window (ellipse centre 200,131.75, radii 193x100.9) and rows 24..215",
+ "size": [
+  400,
+  240
+ ],
+ "video": {
+  "file": "clip.mp4",
+  "fps": 30,
+  "from_clip": 240,
+  "seconds": 4.0
+ }
+}

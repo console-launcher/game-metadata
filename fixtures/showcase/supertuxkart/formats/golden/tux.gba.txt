@@ -1,0 +1,3 @@
+file: tux.gba
+info: {"platform":"GameBoyAdvance","title":"SUPERTUXKART","titles":{"English":{"name":"SUPERTUXKART","shortName":"SUPERTUXKART","publisher":null}},"titleId":null,"productCode":"AGB-TUXE","gameId":"TUXE","makerCode":"00","headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica"],"regionFree":false,"ratings":{},"banner":null,"version":0,"cart":{"family":"gba","title":"SUPERTUXKART","game_code":"TUXE","maker_code":"00","version":0,"complement":233,"complement_valid":true}}
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":"94abb1a58b2f015684edb7e24787f396","primaryId":null}

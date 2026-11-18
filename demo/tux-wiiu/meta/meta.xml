@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu type="complex" access="777">
+  <title_id type="hexBinary" length="8">000500001FF3FF00</title_id>
+  <product_code type="string" length="32">WUP-P-TUXE</product_code>
+  <region type="hexBinary" length="4">00000007</region>
+  <longname_ja type="string" length="512">SuperTuxKart
+カートレース</longname_ja>
+  <shortname_ja type="string" length="256">SuperTuxKart</shortname_ja>
+  <publisher_ja type="string" length="256">SuperTuxKart Team</publisher_ja>
+  <longname_en type="string" length="512">SuperTuxKart
+Kart racing</longname_en>
+  <shortname_en type="string" length="256">SuperTuxKart</shortname_en>
+  <publisher_en type="string" length="256">SuperTuxKart Team</publisher_en>
+  <longname_fr type="string" length="512">SuperTuxKart
+Course de karts</longname_fr>
+  <shortname_fr type="string" length="256">SuperTuxKart</shortname_fr>
+  <publisher_fr type="string" length="256">SuperTuxKart Team</publisher_fr>
+  <longname_de type="string" length="512">SuperTuxKart
+Kart-Rennen</longname_de>
+  <shortname_de type="string" length="256">SuperTuxKart</shortname_de>
+  <publisher_de type="string" length="256">SuperTuxKart Team</publisher_de>
+  <longname_it type="string" length="512">SuperTuxKart
+Corsa di kart</longname_it>
+  <shortname_it type="string" length="256">SuperTuxKart</shortname_it>
+  <publisher_it type="string" length="256">SuperTuxKart Team</publisher_it>
+  <longname_es type="string" length="512">SuperTuxKart
+Carreras de karts</longname_es>
+  <shortname_es type="string" length="256">SuperTuxKart</shortname_es>
+  <publisher_es type="string" length="256">SuperTuxKart Team</publisher_es>
+  <longname_zhs type="string" length="512">SuperTuxKart
+卡丁车竞速</longname_zhs>
+  <shortname_zhs type="string" length="256">SuperTuxKart</shortname_zhs>
+  <publisher_zhs type="string" length="256">SuperTuxKart Team</publisher_zhs>
+  <longname_ko type="string" length="512">SuperTuxKart
+카트 레이싱</longname_ko>
+  <shortname_ko type="string" length="256">SuperTuxKart</shortname_ko>
+  <publisher_ko type="string" length="256">SuperTuxKart Team</publisher_ko>
+  <longname_nl type="string" length="512">SuperTuxKart
+Kartracen</longname_nl>
+  <shortname_nl type="string" length="256">SuperTuxKart</shortname_nl>
+  <publisher_nl type="string" length="256">SuperTuxKart Team</publisher_nl>
+  <longname_pt type="string" length="512">SuperTuxKart
+Corrida de karts</longname_pt>
+  <shortname_pt type="string" length="256">SuperTuxKart</shortname_pt>
+  <publisher_pt type="string" length="256">SuperTuxKart Team</publisher_pt>
+  <longname_ru type="string" length="512">SuperTuxKart
+Гонки на картах</longname_ru>
+  <shortname_ru type="string" length="256">SuperTuxKart</shortname_ru>
+  <publisher_ru type="string" length="256">SuperTuxKart Team</publisher_ru>
+  <longname_zht type="string" length="512">SuperTuxKart
+卡丁車競速</longname_zht>
+  <shortname_zht type="string" length="256">SuperTuxKart</shortname_zht>
+  <publisher_zht type="string" length="256">SuperTuxKart Team</publisher_zht>
+</menu>

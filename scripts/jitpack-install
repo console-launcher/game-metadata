@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# JitPack's `install:` step (see jitpack.yml): JitPack never builds the Rust code. This downloads game-metadata-<v>.aar and its POM
+# from the GitHub release of the tag JitPack is building and installs them into ~/.m2 with `mvn install:install-file`, checking
+# them against the release's SHA256SUMS first. JitPack sets GROUP (com.github.<owner>), ARTIFACT (the repository name) and
+# VERSION (the tag, v<version>). GAMEMETA_RELEASE_BASE replaces the download URL (the local test points it at a directory).
+set -euo pipefail
+: "${GROUP:?GROUP is set by JitPack}" "${ARTIFACT:?ARTIFACT is set by JitPack}" "${VERSION:?VERSION is set by JitPack}"
+owner="${GROUP#com.github.}"
+v="${VERSION#v}"
+base="${GAMEMETA_RELEASE_BASE:-https://github.com/$owner/$ARTIFACT/releases/download/$VERSION}"
+tmp="$(mktemp -d)"
+trap 'find "$tmp" -mindepth 1 -delete; rmdir "$tmp"' EXIT
+aar="game-metadata-$v.aar"
+pom="game-metadata-$v.pom"
+for f in "$aar" "$pom" SHA256SUMS; do
+  curl -fsSL --retry 3 -o "$tmp/$f" "$base/$f"
+done
+[[ "$(grep -c -F -e " $aar" -e " $pom" "$tmp/SHA256SUMS")" == 2 ]] || { echo "SHA256SUMS does not list $aar and $pom" >&2; exit 1; }
+(cd "$tmp" && grep -F -e " $aar" -e " $pom" SHA256SUMS | sha256sum -c --quiet -)
+
+# The release POM names version $v; JitPack's coordinates are GROUP:ARTIFACT:VERSION (the tag), so rewrite the first occurrence of each.
+sed -e "0,/<groupId>[^<]*<\/groupId>/s##<groupId>$GROUP</groupId>#" \
+    -e "0,/<artifactId>[^<]*<\/artifactId>/s##<artifactId>$ARTIFACT</artifactId>#" \
+    -e "0,/<version>[^<]*<\/version>/s##<version>$VERSION</version>#" "$tmp/$pom" > "$tmp/pom.xml"
+
+mvn -B install:install-file -Dfile="$tmp/$aar" -DpomFile="$tmp/pom.xml" \
+  -DgroupId="$GROUP" -DartifactId="$ARTIFACT" -Dversion="$VERSION" -Dpackaging=aar

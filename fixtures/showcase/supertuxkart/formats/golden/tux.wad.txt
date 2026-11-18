@@ -1,0 +1,3 @@
+file: tux.wad
+info: {"platform":"Wii","title":null,"titles":{},"titleId":"000100015455584B","productCode":null,"gameId":"TUXK","makerCode":null,"headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":[],"regionFree":false,"ratings":{},"banner":null,"version":null,"cart":null}
+ids: {"serial":null,"gameId":null,"titleId":"000100015455584B","chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":null,"primaryId":"000100015455584B"}

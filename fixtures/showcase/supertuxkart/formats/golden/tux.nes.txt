@@ -1,0 +1,3 @@
+file: tux.nes
+info: {"platform":"Nes","title":null,"titles":{},"titleId":null,"productCode":null,"gameId":null,"makerCode":null,"headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":[],"regionFree":false,"ratings":{},"banner":null,"version":null,"cart":{"family":"nes","format":0,"mapper":0,"submapper":null,"prg_rom":16384,"chr_rom":0,"prg_ram":0,"prg_nvram":0,"chr_ram":0,"chr_nvram":0,"mirroring":0,"battery":false,"trainer":false,"timing":0,"console":0}}
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":"ce338fe6899778aacfc28414f2d9498b","primaryId":null}

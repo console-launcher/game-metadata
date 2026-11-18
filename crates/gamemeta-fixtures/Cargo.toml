@@ -1,0 +1,49 @@
+[package]
+name = "gamemeta-fixtures"
+description = "Synthetic game files built in code, for tests, fuzz seeds and binding checks. No game data."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "write-fixtures"
+path = "src/bin/write_fixtures.rs"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "write-demo"
+path = "src/bin/write_demo.rs"
+
+[[bin]]
+name = "write-wii-banner-fixtures"
+path = "src/bin/write_wii_banner_fixtures.rs"
+
+[[bin]]
+name = "write-fuzz-seeds"
+path = "src/bin/write_fuzz_seeds.rs"
+
+[dependencies]
+# Hand-built banner scenes for the renderer tests.
+banner3ds-scene.workspace = true
+# The texture coordinator transform the CGFX writer stores as a matrix.
+banner3ds-soft.workspace = true
+gamemeta-core.workspace = true
+gamemeta-json.workspace = true
+# Deflate for the synthetic zip files (the readers' own inflater is a different code path: miniz_oxide again, but the
+# compressor side is only here).
+miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
+ruzstd = "0.9"
+encoding_rs = "0.8"
+# A headless GLES 3 context for the GL renderer tests and bench (EGL, loaded at run time).
+khronos-egl = { version = "6.0.0", features = ["dynamic"], optional = true }
+
+[features]
+gl = ["dep:khronos-egl"]
+
+[[bin]]
+name = "write-stk-banner"
+path = "src/bin/write_stk_banner.rs"

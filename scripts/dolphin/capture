@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Capture how Dolphin's Wii Menu draws a disc's channel banner: boots the Wii Menu from the imported NAND, inserts the disc, dumps
+# the emulator's own frames (lossless PNG, frame-exact: a slow software renderer only costs wall time) while the Disc Channel tile
+# plays the banner, and keeps the tile crop of each frame under $WII_REFS/out/<slug>/ with a meta.json.
+#   scripts/dolphin/capture <disc.rvz> <slug> [frames=1800] [internal-resolution=1]
+# Private: the disc, the NAND and every frame stay under $WII_REFS. Silent (no audio backend). Logs carry the slug only.
+set -euo pipefail
+. "$(dirname "$0")/lib.sh"
+disc=${1:?usage: capture <disc.rvz> <slug> [frames] [internal-resolution]}; slug=${2:?slug}; frames=${3:-1800}; scale=${4:-1}
+case "$slug" in *[!a-z0-9_-]*|'') echo "slug: a-z 0-9 _ - only" >&2; exit 2;; esac
+"$(dirname "$0")/preflight" >/dev/null || { "$(dirname "$0")/preflight"; exit 3; }
+[ -f "$disc" ] || { echo "no such disc" >&2; exit 2; }
+out="$ROOT/out/$slug"; mkdir -p "$out"; chmod 700 "$ROOT" "$ROOT/out" "$out" 2>/dev/null || true
+cfg="$ROOT/user/Config"; frames_dir="$ROOT/user/Dump/Frames"
+mkdir -p "$frames_dir"
+
+# Settings Dolphin reads at start: OpenGL on Mesa, no audio, the emulated remote's A and B on the keyboard (a click is too short for
+# Dolphin's polling; the Wii Menu's A is all the capture presses).
+cat > "$cfg/Dolphin.ini" <<INI
+[Analytics]
+PermissionAsked = True
+Enabled = False
+[Core]
+GFXBackend = OGL
+CPUCore = 1
+[DSP]
+Backend = No Audio Output
+[Interface]
+ConfirmStop = False
+UsePanicHandlers = False
+INI
+printf '[Settings]\nInternalResolution = %s\nShowFPS = False\nBackendMultithreading = False\nDumpFramesAsImages = True\nDumpFramesSilent = True\n' "$scale" > "$cfg/GFX.ini"
+if [ -f "$cfg/WiimoteNew.ini" ]; then
+  sed -i 's/^Buttons\/A = .*/Buttons\/A = x/; s/^Buttons\/B = .*/Buttons\/B = z/' "$cfg/WiimoteNew.ini"
+fi
+find "$frames_dir" -maxdepth 1 -name 'framedump_*.png' -delete
+
+trap stop_all EXIT
+start_xvfb
+start_dolphin
+click $MENU_TOOLS; sleep 1; click $MENU_LOAD_WII_MENU
+timeout 300 bash -c 'until xdotool search --name "Wii Menu" >/dev/null 2>&1; do sleep 2; done'
+win=$(render_window)
+xdotool windowmove "$win" 0 120      # off the main window's menu bar
+xdotool windowfocus "$win"
+# Health and safety screen (A), then the menu loads; the speed depends on the machine, so wait generously.
+for _ in $(seq 15); do sleep 10; xdotool key x; done
+sleep 60
+click $MENU_FILE; sleep 2; click $MENU_CHANGE_DISC
+wait_windows -ge 3                                          # the file dialog
+xdotool type --delay 20 "$disc"; xdotool key Return
+wait_windows -le 2; sleep 20
+# Movie > Dump Frames on; the menu is slow to open under load, so confirm by the first frame file and toggle again if none comes.
+started=""
+for _ in 1 2 3; do
+  click $MENU_MOVIE; sleep 2; click $MENU_DUMP_FRAMES
+  for _ in $(seq 40); do sleep 3; [ -n "$(find "$frames_dir" -name 'framedump_*.png' | head -1)" ] && { started=1; break; }; done
+  [ -n "$started" ] && break
+  click $MENU_MOVIE; sleep 2; click $MENU_DUMP_FRAMES     # it was on without frames, or the click missed: flip it back
+done
+[ -n "$started" ] || { echo "the frame dump did not start" >&2; exit 4; }
+timeout $((frames * 6 + 300)) bash -c "until [ \$(find '$frames_dir' -name 'framedump_*.png' | wc -l) -ge $frames ]; do sleep 3; done" || true
+click $MENU_MOVIE; sleep 2; click $MENU_DUMP_FRAMES       # off
+sleep 5
+n=$(find "$frames_dir" -name 'framedump_*.png' | wc -l)
+[ "$n" -gt 0 ] || { echo "no frames were dumped" >&2; exit 4; }
+# The Disc Channel tile is the top left tile; crop it from every frame (full frames are discarded). Rect measured at 1x on 996x544.
+w=$(python3 -I -c "import struct,sys;print(struct.unpack('>I',open(sys.argv[1],'rb').read(24)[16:20])[0])" "$frames_dir/framedump_1.png")
+k=$(python3 -I -c "print($w/996)")
+rect=$(python3 -I -c "k=$k;print(':'.join(str(round(v*k)) for v in (235,130,70,35)))")
+mkdir -p "$out/frames"; find "$out/frames" -maxdepth 1 -name '*.png' -delete
+ffmpeg -loglevel error -y -framerate 60 -i "$frames_dir/framedump_%d.png" -vf "crop=$rect" "$out/frames/%04d.png"
+find "$frames_dir" -maxdepth 1 -name 'framedump_*.png' -delete
+ver=$(flatpak info "$APP" | awk '/Version:/ {print $2}'); commit=$(flatpak info "$APP" | awk '/Commit:/ {print substr($2,1,12)}')
+printf '{\n  "slug": "%s",\n  "dolphin": "%s",\n  "flatpak_commit": "%s",\n  "backend": "OpenGL (Mesa software)",\n  "internal_resolution": %s,\n  "frames": %s,\n  "frame_size": [%s],\n  "crop_tile": "w:h:x:y = %s",\n  "surface": "the Disc Channel tile, drawn from the channel icon (icon.bin)",\n  "region_note": "Wii Menu of the imported NAND, disc inserted with Change Disc"\n}\n' \
+  "$slug" "$ver" "$commit" "$scale" "$n" "$(echo "$rect" | awk -F: '{print $1", "$2}')" "$rect" > "$out/meta.json"
+say OK "$slug: $n frames in $out"

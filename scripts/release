@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Builds the release artifacts into dist/game-metadata-<version>/:
+#   game-metadata-<v>.aar        Android: Kotlin API classes + libgamemeta_jni.so for arm64-v8a, armeabi-v7a, x86_64, x86
+#   game-metadata-host-<v>.jar   desktop JVMs (unit tests): the same classes + host libraries: linux-x86_64, and
+#                                windows-x86_64 / macos-aarch64 when cargo-xwin / cargo-zigbuild are installed
+#   gamemeta.h, LICENSE, NOTICE.md   the C API header (the .so files export it too); the classes jar (so the AAR and host jar) carries both in META-INF/
+#   SHA256SUMS
+# Also runs the open-door compile check: core + ffi for aarch64-unknown-linux-gnu (no Linux artifact is built).
+# Needs: rustup targets aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+# aarch64-unknown-linux-gnu,
+# an NDK (scripts/android-env), a JDK 17.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root="$PWD"
+version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
+out="dist/game-metadata-$version"
+stage="target/release-stage"
+mkdir -p "$out" "$stage/host"
+find "$stage/host" -mindepth 1 -delete
+# shellcheck source=android-env
+source scripts/android-env
+
+declare -A abi=([aarch64-linux-android]=arm64-v8a [armv7-linux-androideabi]=armeabi-v7a [x86_64-linux-android]=x86_64 [i686-linux-android]=x86)
+aar_entries=()
+for target in "${!abi[@]}"; do
+  echo "== $target" >&2
+  cargo build -p gamemeta-jni --release --locked --target "$target" --quiet
+  aar_entries+=("jni/${abi[$target]}/libgamemeta_jni.so=target/$target/release/libgamemeta_jni.so")
+done
+echo "== host" >&2
+cargo build -p gamemeta-jni --release --locked --quiet
+# Optional desktop hosts for the host jar, when their cross tools are installed.
+host_libs=("gamemeta/native/linux-x86_64/libgamemeta_jni.so=target/release/libgamemeta_jni.so")
+if command -v cargo-xwin >/dev/null; then
+  echo "== host windows-x86_64 (cargo-xwin)" >&2
+  cargo xwin build -p gamemeta-jni --release --locked --target x86_64-pc-windows-msvc --quiet
+  host_libs+=("gamemeta/native/windows-x86_64/gamemeta_jni.dll=target/x86_64-pc-windows-msvc/release/gamemeta_jni.dll")
+else
+  echo "skip: windows-x86_64 (cargo install --locked cargo-xwin)" >&2
+fi
+zig_bin="${ZIG_BIN:-$HOME/.local/share/zig-venv/bin}"
+if command -v cargo-zigbuild >/dev/null && { command -v zig >/dev/null || "$zig_bin/python3" -c "import ziglang" 2>/dev/null; }; then
+  echo "== host macos-aarch64 (cargo-zigbuild)" >&2
+  PATH="$zig_bin:$PATH" cargo zigbuild -p gamemeta-jni --release --locked --target aarch64-apple-darwin --quiet
+  host_libs+=("gamemeta/native/macos-aarch64/libgamemeta_jni.dylib=target/aarch64-apple-darwin/release/libgamemeta_jni.dylib")
+else
+  echo "skip: macos-aarch64 (cargo-zigbuild + zig: pip install ziglang)" >&2
+fi
+echo "== open door: aarch64-unknown-linux-gnu (check only)" >&2
+cargo check -p gamemeta-core -p gamemeta-ffi --release --locked --target aarch64-unknown-linux-gnu --quiet
+
+echo "== kotlin classes" >&2
+(cd bindings/kotlin && ./gradlew --no-daemon -q jar)
+classes="bindings/kotlin/build/libs/game-metadata-classes-$version.jar"
+: > "$stage/R.txt"
+
+python3 -I scripts/package.py "$out/game-metadata-$version.aar" \
+  "AndroidManifest.xml=bindings/android/AndroidManifest.xml" \
+  "classes.jar=$classes" \
+  "proguard.txt=bindings/android/consumer-rules.pro" \
+  "R.txt=$stage/R.txt" \
+  "${aar_entries[@]}"
+
+# The host jar: the classes jar's entries plus the host library.
+(cd "$stage/host" && unzip -q "$root/$classes")
+host_entries=()
+while IFS= read -r f; do host_entries+=("${f#"$stage/host/"}=$f"); done < <(find "$stage/host" -type f)
+python3 -I scripts/package.py "$out/game-metadata-host-$version.jar" \
+  "${host_entries[@]}" "${host_libs[@]}"
+
+cp crates/gamemeta-ffi/include/gamemeta.h LICENSE NOTICE.md "$out/"
+(cd "$out" && sha256sum game-metadata-*.aar game-metadata-host-*.jar gamemeta.h LICENSE NOTICE.md > SHA256SUMS)
+
+echo "== sizes (bytes)" >&2
+for target in "${!abi[@]}"; do
+  printf '%-14s %s\n' "${abi[$target]}" "$(stat -c %s "target/$target/release/libgamemeta_jni.so")"
+done
+for h in "${host_libs[@]}"; do
+  printf '%-14s %s\n' "$(basename "$(dirname "${h%%=*}")")" "$(stat -c %s "${h#*=}")"
+done
+(cd "$out" && stat -c '%n %s' ./*.aar ./*.jar)
+echo "release: $out" >&2

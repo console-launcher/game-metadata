@@ -1,0 +1,22 @@
+[package]
+name = "banner3ds-scene"
+description = "Nintendo 3DS HOME banners (CBMD, CGFX) parsed into a renderer-neutral scene: models, textures, lights, animations."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+std = ["gamemeta-core/std"]
+
+[dependencies]
+gamemeta-core.workspace = true
+libm.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+gamemeta-fixtures.workspace = true

@@ -1,0 +1,34 @@
+#!/bin/bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Is this machine ready to capture Wii channel banners from Dolphin's Wii Menu? One line per check, and what is missing.
+# Reads no key and no game: only existence and sizes. env: WII_REFS (see lib.sh).
+set -u
+. "$(dirname "$0")/lib.sh"
+ok=1
+
+if info=$(flatpak info "$APP" 2>/dev/null); then
+  say OK "Dolphin $(echo "$info" | awk '/Version:/ {print $2}') (flatpak commit $(echo "$info" | awk '/Commit:/ {print substr($2,1,12)}'))"
+else
+  say MISSING "Dolphin (flatpak install flathub $APP)"; ok=0
+fi
+for tool in Xvfb xdotool ffmpeg; do
+  command -v "$tool" >/dev/null && say OK "$tool" || { say MISSING "$tool"; ok=0; }
+done
+dump="$ROOT/nand-dump"
+if [ -f "$dump/nand.bin" ] && [ -f "$dump/keys.bin" ]; then
+  say OK "BootMii backup present: nand.bin $(stat -c %s "$dump/nand.bin") bytes (the keys file is never read by these scripts)"
+else
+  say MISSING "a BootMii NAND backup (nand.bin and keys.bin side by side) in $dump, dumped from your own console; see scripts/dolphin/README.md"; ok=0
+fi
+if [ -d "$ROOT/user/Wii/title/00000001/00000002" ]; then
+  say OK "Wii Menu is in Dolphin's NAND (title 00000001-00000002)"
+else
+  say MISSING "Wii Menu in Dolphin's NAND: import the backup once (Tools > Manage NAND > Import BootMii NAND Backup, 'user' dir $ROOT/user)"; ok=0
+fi
+n=$(find "$ROOT/discs" -maxdepth 1 -name '*.rvz' 2>/dev/null | wc -l)
+if [ "$n" -gt 0 ]; then say OK "$n disc(s) in $ROOT/discs"; else say MISSING "discs: your own .rvz files in $ROOT/discs"; ok=0; fi
+[ $ok = 1 ] && say READY "capture: scripts/dolphin/capture <disc.rvz> <slug>" || say BLOCKED "see scripts/dolphin/README.md"
+exit $((1 - ok))

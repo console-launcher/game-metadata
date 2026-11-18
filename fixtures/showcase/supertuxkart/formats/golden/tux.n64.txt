@@ -1,0 +1,3 @@
+file: tux.n64
+info: {"platform":"Nintendo64","title":"SUPERTUXKART","titles":{"English":{"name":"SUPERTUXKART","shortName":"SUPERTUXKART","publisher":null}},"titleId":null,"productCode":null,"gameId":"NTXE","makerCode":null,"headerTitle":null,"icon":null,"smallIcon":null,"animation":[],"images":[],"bootMovie":null,"bootSound":null,"regions":["NorthAmerica"],"regionFree":false,"ratings":{},"banner":null,"version":0,"cart":{"family":"n64","byte_order":2,"title":"SUPERTUXKART","game_code":"NTXE","country":69,"version":0,"crc1":0,"crc2":0}}
+ids: {"serial":null,"gameId":null,"titleId":null,"chdSha1":null,"zipCrc":null,"zipSize":null,"pspTitle":null,"pspDiscId":null,"xboxId":null,"raMd5":"36d4db2cd946cdf971342237b2553632","primaryId":null}

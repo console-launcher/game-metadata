@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Builds the website (site/) into site/dist: the wasm binding (release, wasm32), the wasm-bindgen glue, the page, and the demo
+# fixtures. Static files only, nothing fetched from anywhere at run time. Needs the wasm32-unknown-unknown target and a
+# wasm-bindgen CLI of the same version as the crate (Cargo.lock): cargo install --locked wasm-bindgen-cli --version <that>.
+#   scripts/site-build
+set -euo pipefail
+cd "$(dirname "$0")/.."
+dist=site/dist
+
+want=$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/[^0-9.]/, "", $0); print; exit }' Cargo.lock)
+have=$(wasm-bindgen --version | awk '{ print $2 }')
+if [[ "$want" != "$have" ]]; then
+  echo "wasm-bindgen CLI is $have but Cargo.lock has $want: cargo install --locked wasm-bindgen-cli --version $want" >&2
+  exit 1
+fi
+
+cargo build -p gamemeta-wasm --target wasm32-unknown-unknown --release --quiet
+
+mkdir -p "$dist/pkg" "$dist/demo"
+find "$dist" -type f -delete
+wasm-bindgen --target web --no-typescript --out-dir "$dist/pkg" target/wasm32-unknown-unknown/release/gamemeta_wasm.wasm
+if command -v wasm-opt >/dev/null; then
+  wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int -o "$dist/pkg/opt.wasm" "$dist/pkg/gamemeta_wasm_bg.wasm"
+  mv "$dist/pkg/opt.wasm" "$dist/pkg/gamemeta_wasm_bg.wasm"
+fi
+
+# The repository link comes from the remote, not from the page source.
+repo=${GAMEMETA_REPO_URL:-$(git remote get-url origin 2>/dev/null || true)}
+repo=${repo%.git}
+repo=${repo/#git@github.com:/https://github.com/}
+sed "s|@REPO_URL@|${repo:-https://github.com}|g" site/src/index.html > "$dist/index.html"
+# The "Supported files" list is the library's own (`gamemeta formats`), never typed into the page.
+cargo run -q -p gamemeta-cli -- formats > "$dist/formats.txt"
+python3 - "$dist" <<'PY'
+import html, sys
+dist = sys.argv[1]
+lines = [l.rstrip("\n") for l in open(f"{dist}/formats.txt", encoding="utf-8") if l.strip()]
+assert lines, "gamemeta formats printed nothing"
+items = []
+for line in lines:
+    name, exts = line.split(" — ", 1)
+    items.append(f"    <li><strong>{html.escape(name)}</strong> — {html.escape(exts)}</li>")
+page = open(f"{dist}/index.html", encoding="utf-8").read()
+assert "@FORMATS@" in page
+open(f"{dist}/index.html", "w", encoding="utf-8").write(page.replace("@FORMATS@", "\n".join(items)))
+PY
+rm "$dist/formats.txt"
+cp site/src/style.css site/src/app.js site/src/files.js site/src/worker.js site/src/bannerexport.js site/src/video.js "$dist/"
+cp fixtures/sample.3ds fixtures/scene/features/bone-anim.cbmd "$dist/demo/"
+# More demos: the top-level demo/ folder (any depth; its README.md and CREDITS.md stay out). "Try a demo" loads every file
+# listed in demo/index.json, which is written here; the credit lines are the "> " lines of demo/CREDITS.md.
+cp -r demo/. "$dist/demo/"
+python3 - "$dist/demo" demo/CREDITS.md <<'PY'
+import json, os, sys
+root, credits_path = sys.argv[1:3]
+docs = ("README.md", "CREDITS.md", "index.json")
+for name in docs:
+    if os.path.exists(os.path.join(root, name)):
+        os.remove(os.path.join(root, name))
+files = sorted(os.path.relpath(os.path.join(d, f), root) for d, _, fs in os.walk(root) for f in fs)
+credits = ["Demo files are samples made for this site."]
+credits += [l[2:].strip() for l in open(credits_path, encoding="utf-8") if l.startswith("> ")]
+json.dump({"files": files, "credits": credits}, open(os.path.join(root, "index.json"), "w", encoding="utf-8"), indent=1)
+PY
+# The footer always carries the demo art's credit line (the "> " line of demo/CREDITS.md) and links the notices and the credits.
+cp NOTICE.md "$dist/NOTICE.md"
+cp demo/CREDITS.md "$dist/CREDITS.md"
+python3 - "$dist" demo/CREDITS.md <<'PY'
+import html, sys
+dist, credits_path = sys.argv[1:3]
+line = next(l[2:].strip() for l in open(credits_path, encoding="utf-8") if l.startswith("> "))
+page = open(f"{dist}/index.html", encoding="utf-8").read()
+assert "@CREDIT@" in page
+open(f"{dist}/index.html", "w", encoding="utf-8").write(page.replace("@CREDIT@", html.escape(line)))
+PY
+touch "$dist/.nojekyll"
+
+wasm_bytes=$(stat -c %s "$dist/pkg/gamemeta_wasm_bg.wasm")
+gz_bytes=$(gzip -9 -c "$dist/pkg/gamemeta_wasm_bg.wasm" | wc -c)
+echo "site-build: $dist ready (wasm $wasm_bytes bytes, $gz_bytes gzipped)" >&2

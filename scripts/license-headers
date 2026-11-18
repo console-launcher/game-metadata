@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+"""MPL-2.0 Exhibit A notice at the top of every source file we wrote.
+  scripts/license-headers --check   list files without it (exit 1); scripts/check runs this
+  scripts/license-headers --fix     add it where missing
+Covered: tracked .rs .c .h .kt .kts .js .mjs .css files and shell/python scripts. Skipped: generated or third-party files (the Gradle
+wrapper), fixtures, and the C header, whose notice comes from crates/gamemeta-ffi/cbindgen.toml."""
+import os
+import subprocess
+import sys
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+LINES = [
+    "This Source Code Form is subject to the terms of the Mozilla Public",
+    "License, v. 2.0. If a copy of the MPL was not distributed with this",
+    "file, You can obtain one at https://mozilla.org/MPL/2.0/.",
+]
+SKIP = {"bindings/kotlin/gradlew"}
+SKIP_PREFIXES = ("fixtures/", "bindings/kotlin/gradle/")
+
+
+def comment(path):
+    ext = os.path.splitext(path)[1]
+    if ext in (".rs", ".kt", ".kts", ".js", ".mjs"):
+        return "// ", ""
+    if ext in (".c", ".h", ".css"):
+        return "/* ", " */"
+    if ext == ".py" or ext == "" and path.startswith("scripts/"):
+        return "# ", ""
+    return None
+
+
+def header(path):
+    start, end = comment(path)
+    if end:  # C block comment: one line per sentence chunk, closed on the last
+        out = [start + LINES[0]] + [" * " + line for line in LINES[1:]]
+        out[-1] += end
+        return "\n".join(out) + "\n"
+    return "".join(start + line + "\n" for line in LINES)
+
+
+def files():
+    names = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).split("\n")
+    for p in filter(None, names):
+        if p in SKIP or p.startswith(SKIP_PREFIXES) or p == "crates/gamemeta-ffi/include/gamemeta.h":
+            continue
+        if comment(p):
+            yield p
+
+
+def main():
+    mode = sys.argv[1] if len(sys.argv) > 1 else "--check"
+    missing = []
+    for p in files():
+        full = os.path.join(ROOT, p)
+        with open(full, encoding="utf-8") as f:
+            text = f.read()
+        shebang, body = "", text
+        if text.startswith("#!"):
+            shebang, _, body = text.partition("\n")
+            shebang += "\n"
+        h = header(p)
+        if body.startswith(h):
+            continue
+        missing.append(p)
+        if mode == "--fix":
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(shebang + h + "\n" + body)
+    if mode == "--fix":
+        print(f"added to {len(missing)} files")
+        return 0
+    for p in missing:
+        print(f"missing MPL-2.0 notice: {p}", file=sys.stderr)
+    return 1 if missing else 0
+
+
+sys.exit(main())
