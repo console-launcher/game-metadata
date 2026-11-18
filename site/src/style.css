@@ -111,8 +111,13 @@ figcaption button { padding: .2rem .6rem; }
 
 .formats { margin-top: 1.5rem; }
 .formats h2 { margin: 0 0 .5rem; font-size: 1.05rem; }
-.formats ul { list-style: none; margin: 0; padding: 0; columns: 20rem; column-gap: 2rem; font-size: .92rem; }
-.formats li { break-inside: avoid; padding: .15rem 0; overflow-wrap: anywhere; }
+.formats table { width: 100%; border-collapse: collapse; font-size: .92rem; text-align: left; }
+.formats th, .formats td { text-align: left; padding: .45rem .6rem .45rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.formats thead th { font-size: .8rem; font-weight: 600; color: var(--muted); }
+.formats tbody th { font-weight: 600; white-space: nowrap; }
+.formats td { line-height: 1.9; }
+.formats td code { font-size: .82rem; padding: .1rem .4rem; margin-right: .25rem; border-radius: .3rem; background: var(--stage); font-family: var(--mono); }
+@media (max-width: 40rem) { .formats tbody th { white-space: normal; } }
 footer { margin-top: 1.5rem; font-size: .88rem; color: var(--muted); }
 
 @media (max-width: 30rem) {

@@ -300,7 +300,7 @@ test('the drop zone is compact and centred at phone and desktop widths, in both 
       assert.equal(prompt, 'center', `${where}: the prompt is centred`);
       assert.equal(await page.locator('#clear').isVisible(), false, `${where}: Clear is hidden with nothing loaded`);
       assert.equal(await page.locator('.privacy strong').count(), 0, `${where}: the privacy line is quiet text`);
-      assert.equal(await page.locator('table, [data-readme]').count(), 0, 'nothing of the README is repeated');
+      assert.equal(await page.locator('table:not(.formats table), [data-readme]').count(), 0, 'nothing of the README is repeated');
       const link = page.locator('a[aria-label="Source on GitHub"]');
       assert.ok((await link.getAttribute('href')).startsWith('http'), 'the repo link has an address');
       assert.equal(await link.locator('svg').count(), 1, 'the GitHub mark is inline');
@@ -530,14 +530,20 @@ test('headings are in order, the controls are labelled, and reduced motion start
 });
 
 // The supported-files list is the library's own (`gamemeta formats`), put into the page at build time.
-test('the page lists the supported files per platform, as plain text, from the library', async () => {
+test('the page lists the supported files per platform, as a table, from the library', async () => {
   const { page } = await open();
-  const rows = await page.$$eval('.formats li', (items) => items.map((li) => li.textContent));
+  assert.equal(await page.locator('.formats table').count(), 1, 'one table');
+  assert.ok(await page.$eval('.formats table', (t) => t.caption?.textContent.trim().length > 0 || t.getAttribute('aria-labelledby') === 'formats-h'), 'named table');
+  assert.deepEqual(await page.$$eval('.formats thead th', (h) => h.map((c) => c.textContent.trim())), ['System', 'File types']);
+  const rows = await page.$$eval('.formats tbody tr', (trs) => trs.map((tr) => {
+    const [name, types] = tr.children;
+    return `${name.textContent.trim()} — ${[...types.querySelectorAll('code')].map((c) => c.textContent).join(' ')}`;
+  }));
   assert.ok(rows.length >= 12, `${rows.length} rows`);
   for (const want of ['Nintendo DS, DSi — .nds .dsi .srl .ids .zip', 'Game Boy Advance — .gba .agb', 'Nintendo 64 — .z64 .v64 .n64', 'Super Nintendo — .sfc', 'NES — .nes', 'Sega Genesis, 32X — .md', 'Master System, Game Gear — .sms .gg']) {
     assert.ok(rows.some((r) => r.startsWith(want)), `${want}\n${rows.join('\n')}`);
   }
-  assert.equal(await page.locator('.formats code, .formats table, .formats p').count(), 0, 'no prose or code in the list');
+  assert.equal(await page.locator('.formats tbody tr').count(), rows.length);
 });
 
 // Field names are technical terms and stay as they are.
